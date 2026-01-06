@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import Head from 'next/head'
 import { parseNumber, formatNumber } from '../utils/numberParser'
-import '../styles/globals.css'
-import '../styles/animations.css'
 
 export default function TradeCalculator() {
   const [player1Total, setPlayer1Total] = useState('')
