@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 
 // Parse shorthand like 100k, 1mil, 500k into actual numbers
@@ -25,32 +25,111 @@ const formatNumber = (num) => {
 }
 
 export default function TradeCalculator() {
+  const canvasRef = useRef(null)
   const [player1Total, setPlayer1Total] = useState('')
-  const [player2Total, setPlayer2Total] = useState('')
   const [player1Plants, setPlayer1Plants] = useState(['', '', '', '', '', ''])
   const [player2Plants, setPlayer2Plants] = useState(['', '', '', '', '', ''])
+
+  // Particle animation
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    const particles = []
+    const particleCount = 50
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width
+        this.y = Math.random() * canvas.height
+        this.size = Math.random() * 3 + 1
+        this.speedX = Math.random() * 1 - 0.5
+        this.speedY = Math.random() * 1 - 0.5
+        this.opacity = Math.random() * 0.5 + 0.2
+      }
+
+      update() {
+        this.x += this.speedX
+        this.y += this.speedY
+
+        if (this.x > canvas.width) this.x = 0
+        if (this.x < 0) this.x = canvas.width
+        if (this.y > canvas.height) this.y = 0
+        if (this.y < 0) this.y = canvas.height
+      }
+
+      draw() {
+        ctx.fillStyle = `rgba(139, 92, 246, ${this.opacity})`
+        ctx.beginPath()
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle())
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
+      particles.forEach(particle => {
+        particle.update()
+        particle.draw()
+      })
+
+      // Draw connections
+      particles.forEach((a, i) => {
+        particles.slice(i + 1).forEach(b => {
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+
+          if (distance < 150) {
+            ctx.strokeStyle = `rgba(139, 92, 246, ${0.2 * (1 - distance / 150)})`
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(a.x, a.y)
+            ctx.lineTo(b.x, b.y)
+            ctx.stroke()
+          }
+        })
+      })
+
+      requestAnimationFrame(animate)
+    }
+
+    animate()
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Calculate trade outcome
   const calculateTrade = () => {
     const p1Total = parseNumber(player1Total)
-    const p2Total = parseNumber(player2Total)
     
     const p1Giving = player1Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     const p2Giving = player2Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     
     const p1NewTotal = p1Total - p1Giving + p2Giving
-    const p2NewTotal = p2Total - p2Giving + p1Giving
-    
     const p1Difference = p1NewTotal - p1Total
-    const p2Difference = p2NewTotal - p2Total
     
     return {
       p1NewTotal,
-      p2NewTotal,
       p1Difference,
-      p2Difference,
       p1IsGood: p1Difference > 0,
-      p2IsGood: p2Difference > 0
+      p1Giving,
+      p2Giving
     }
   }
 
@@ -75,7 +154,9 @@ export default function TradeCalculator() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem' }}>
+      <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: 0, pointerEvents: 'none' }} />
+
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '3rem' }} className="animate-fade-in">
@@ -88,7 +169,7 @@ export default function TradeCalculator() {
           </div>
 
           {/* Trade Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
             {/* Player 1 */}
             <div className="glass-card animate-slide-up">
               <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
@@ -112,7 +193,7 @@ export default function TradeCalculator() {
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
                 Plants Trading Away (2x3 Grid)
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
                 {player1Plants.map((plant, index) => (
                   <input
                     key={index}
@@ -132,24 +213,11 @@ export default function TradeCalculator() {
                 <span style={{ background: '#22c55e', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>2</span>
                 Player 2
               </h2>
-              
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
-                  Total Base Damage
-                </label>
-                <input
-                  type="text"
-                  value={player2Total}
-                  onChange={(e) => setPlayer2Total(e.target.value)}
-                  placeholder="e.g., 15mil or 500k"
-                  className="input-field"
-                />
-              </div>
 
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                Plants Trading Away (2x3 Grid)
+                Plants Trading to You (2x3 Grid)
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
                 {player2Plants.map((plant, index) => (
                   <input
                     key={index}
@@ -167,23 +235,37 @@ export default function TradeCalculator() {
           {/* Results */}
           <div className="glass-card animate-fade-in-delay">
             <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', textAlign: 'center' }}>
-              Trade Results
+              Trade Analysis
             </h3>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-              {/* Player 1 Result */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {/* Trade Summary */}
+              <div className="result-card" style={{ borderColor: '#8b5cf6' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Trading</p>
+                  <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem' }}>
+                    {formatNumber(trade.p1Giving)}
+                  </p>
+                  <p style={{ color: '#d1d5db', marginTop: '1rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Receiving</p>
+                  <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e', marginBottom: '0.5rem' }}>
+                    {formatNumber(trade.p2Giving)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Final Result */}
               <div className="result-card" style={{ borderColor: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.5rem' }}>Player 1</p>
-                  <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>New Total</p>
+                  <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'white', marginBottom: '0.75rem' }}>
                     {formatNumber(trade.p1NewTotal)}
                   </p>
-                  <p style={{ fontSize: '1.125rem', fontWeight: '600', color: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '600', color: trade.p1IsGood ? '#4ade80' : '#f87171', marginBottom: '1rem' }}>
                     {trade.p1Difference >= 0 ? '+' : ''}{formatNumber(trade.p1Difference)}
                   </p>
                   <p style={{ 
                     marginTop: '0.5rem', 
-                    padding: '0.25rem 1rem', 
+                    padding: '0.5rem 1.5rem', 
                     borderRadius: '9999px', 
                     display: 'inline-block', 
                     fontSize: '0.875rem', 
@@ -195,37 +277,17 @@ export default function TradeCalculator() {
                   </p>
                 </div>
               </div>
-
-              {/* Player 2 Result */}
-              <div className="result-card" style={{ borderColor: trade.p2IsGood ? '#4ade80' : '#f87171' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.5rem' }}>Player 2</p>
-                  <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
-                    {formatNumber(trade.p2NewTotal)}
-                  </p>
-                  <p style={{ fontSize: '1.125rem', fontWeight: '600', color: trade.p2IsGood ? '#4ade80' : '#f87171' }}>
-                    {trade.p2Difference >= 0 ? '+' : ''}{formatNumber(trade.p2Difference)}
-                  </p>
-                  <p style={{ 
-                    marginTop: '0.5rem', 
-                    padding: '0.25rem 1rem', 
-                    borderRadius: '9999px', 
-                    display: 'inline-block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 'bold',
-                    background: trade.p2IsGood ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                    color: trade.p2IsGood ? '#4ade80' : '#f87171'
-                  }}>
-                    {trade.p2IsGood ? '✓ GOOD TRADE' : '✗ BAD TRADE'}
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </div>
 
       <style jsx>{`
+        * {
+          box-sizing: border-box;
+          outline: none;
+        }
+
         .glass-card {
           background: rgba(255, 255, 255, 0.05);
           backdrop-filter: blur(10px);
@@ -237,13 +299,14 @@ export default function TradeCalculator() {
 
         .input-field {
           width: 100%;
-          padding: 12px 16px;
+          padding: 14px 18px;
           background: rgba(255, 255, 255, 0.1);
           border: 2px solid rgba(255, 255, 255, 0.2);
           border-radius: 12px;
           color: white;
           font-size: 16px;
           transition: all 0.3s ease;
+          font-family: inherit;
         }
 
         .input-field:focus {
@@ -256,13 +319,14 @@ export default function TradeCalculator() {
 
         .input-field-small {
           width: 100%;
-          padding: 10px 12px;
+          padding: 12px 14px;
           background: rgba(255, 255, 255, 0.08);
           border: 2px solid rgba(255, 255, 255, 0.15);
           border-radius: 10px;
           color: white;
           font-size: 14px;
           transition: all 0.3s ease;
+          font-family: inherit;
         }
 
         .input-field-small:focus {
