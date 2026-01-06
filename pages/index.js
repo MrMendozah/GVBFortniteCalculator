@@ -1,6 +1,28 @@
 import { useState } from 'react'
 import Head from 'next/head'
-import { parseNumber, formatNumber } from '../utils/numberParser'
+
+// Parse shorthand like 100k, 1mil, 500k into actual numbers
+const parseNumber = (value) => {
+  if (!value) return 0
+  const str = value.toString().toLowerCase().trim()
+  
+  if (str.includes('mil') || str.includes('m')) {
+    return parseFloat(str) * 1000000
+  } else if (str.includes('k')) {
+    return parseFloat(str) * 1000
+  }
+  return parseFloat(str) || 0
+}
+
+// Format number back to display (21300000 -> 21.3mil)
+const formatNumber = (num) => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'mil'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(0) + 'k'
+  }
+  return num.toString()
+}
 
 export default function TradeCalculator() {
   const [player1Total, setPlayer1Total] = useState('')
@@ -53,29 +75,29 @@ export default function TradeCalculator() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 py-12 px-4">
-        <div className="max-w-7xl mx-auto">
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem' }}>
+        <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
           {/* Header */}
-          <div className="text-center mb-12 animate-fade-in">
-            <h1 className="text-5xl font-bold text-white mb-4">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }} className="animate-fade-in">
+            <h1 style={{ fontSize: '3rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem' }}>
               GVB Fortnite Trade Calculator
             </h1>
-            <p className="text-gray-300 text-lg">
+            <p style={{ color: '#d1d5db', fontSize: '1.125rem' }}>
               Calculate 2x3 plant trades • Use 100k, 1mil shorthand
             </p>
           </div>
 
           {/* Trade Grid */}
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
             {/* Player 1 */}
             <div className="glass-card animate-slide-up">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <span className="bg-blue-500 w-10 h-10 rounded-full flex items-center justify-center mr-3">1</span>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
+                <span style={{ background: '#3b82f6', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>1</span>
                 Player 1
               </h2>
               
-              <div className="mb-6">
-                <label className="text-gray-300 text-sm font-semibold mb-2 block">
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
                   Total Base Damage
                 </label>
                 <input
@@ -87,10 +109,10 @@ export default function TradeCalculator() {
                 />
               </div>
 
-              <label className="text-gray-300 text-sm font-semibold mb-3 block">
+              <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
                 Plants Trading Away (2x3 Grid)
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                 {player1Plants.map((plant, index) => (
                   <input
                     key={index}
@@ -106,13 +128,13 @@ export default function TradeCalculator() {
 
             {/* Player 2 */}
             <div className="glass-card animate-slide-up-delay">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <span className="bg-green-500 w-10 h-10 rounded-full flex items-center justify-center mr-3">2</span>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
+                <span style={{ background: '#22c55e', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>2</span>
                 Player 2
               </h2>
               
-              <div className="mb-6">
-                <label className="text-gray-300 text-sm font-semibold mb-2 block">
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
                   Total Base Damage
                 </label>
                 <input
@@ -124,10 +146,10 @@ export default function TradeCalculator() {
                 />
               </div>
 
-              <label className="text-gray-300 text-sm font-semibold mb-3 block">
+              <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
                 Plants Trading Away (2x3 Grid)
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                 {player2Plants.map((plant, index) => (
                   <input
                     key={index}
@@ -144,42 +166,56 @@ export default function TradeCalculator() {
 
           {/* Results */}
           <div className="glass-card animate-fade-in-delay">
-            <h3 className="text-2xl font-bold text-white mb-6 text-center">
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', textAlign: 'center' }}>
               Trade Results
             </h3>
             
-            <div className="grid md:grid-cols-2 gap-6">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
               {/* Player 1 Result */}
-              <div className={`result-card ${trade.p1IsGood ? 'border-green-400' : 'border-red-400'}`}>
-                <div className="text-center">
-                  <p className="text-gray-300 mb-2">Player 1</p>
-                  <p className="text-3xl font-bold text-white mb-2">
+              <div className="result-card" style={{ borderColor: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.5rem' }}>Player 1</p>
+                  <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p1NewTotal)}
                   </p>
-                  <p className={`text-lg font-semibold ${trade.p1IsGood ? 'text-green-400' : 'text-red-400'}`}>
+                  <p style={{ fontSize: '1.125rem', fontWeight: '600', color: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
                     {trade.p1Difference >= 0 ? '+' : ''}{formatNumber(trade.p1Difference)}
                   </p>
-                  <p className={`mt-2 px-4 py-1 rounded-full inline-block text-sm font-bold ${
-                    trade.p1IsGood ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                  }`}>
+                  <p style={{ 
+                    marginTop: '0.5rem', 
+                    padding: '0.25rem 1rem', 
+                    borderRadius: '9999px', 
+                    display: 'inline-block', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 'bold',
+                    background: trade.p1IsGood ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    color: trade.p1IsGood ? '#4ade80' : '#f87171'
+                  }}>
                     {trade.p1IsGood ? '✓ GOOD TRADE' : '✗ BAD TRADE'}
                   </p>
                 </div>
               </div>
 
               {/* Player 2 Result */}
-              <div className={`result-card ${trade.p2IsGood ? 'border-green-400' : 'border-red-400'}`}>
-                <div className="text-center">
-                  <p className="text-gray-300 mb-2">Player 2</p>
-                  <p className="text-3xl font-bold text-white mb-2">
+              <div className="result-card" style={{ borderColor: trade.p2IsGood ? '#4ade80' : '#f87171' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.5rem' }}>Player 2</p>
+                  <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p2NewTotal)}
                   </p>
-                  <p className={`text-lg font-semibold ${trade.p2IsGood ? 'text-green-400' : 'text-red-400'}`}>
+                  <p style={{ fontSize: '1.125rem', fontWeight: '600', color: trade.p2IsGood ? '#4ade80' : '#f87171' }}>
                     {trade.p2Difference >= 0 ? '+' : ''}{formatNumber(trade.p2Difference)}
                   </p>
-                  <p className={`mt-2 px-4 py-1 rounded-full inline-block text-sm font-bold ${
-                    trade.p2IsGood ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                  }`}>
+                  <p style={{ 
+                    marginTop: '0.5rem', 
+                    padding: '0.25rem 1rem', 
+                    borderRadius: '9999px', 
+                    display: 'inline-block', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 'bold',
+                    background: trade.p2IsGood ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    color: trade.p2IsGood ? '#4ade80' : '#f87171'
+                  }}>
                     {trade.p2IsGood ? '✓ GOOD TRADE' : '✗ BAD TRADE'}
                   </p>
                 </div>
@@ -188,6 +224,104 @@ export default function TradeCalculator() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .glass-card {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          padding: 2rem;
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .input-field {
+          width: 100%;
+          padding: 12px 16px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          color: white;
+          font-size: 16px;
+          transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+          outline: none;
+          border-color: rgba(139, 92, 246, 0.6);
+          background: rgba(255, 255, 255, 0.15);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .input-field-small {
+          width: 100%;
+          padding: 10px 12px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 2px solid rgba(255, 255, 255, 0.15);
+          border-radius: 10px;
+          color: white;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        }
+
+        .input-field-small:focus {
+          outline: none;
+          border-color: rgba(139, 92, 246, 0.5);
+          background: rgba(255, 255, 255, 0.12);
+          transform: scale(1.02);
+        }
+
+        .input-field::placeholder,
+        .input-field-small::placeholder {
+          color: rgba(255, 255, 255, 0.4);
+        }
+
+        .result-card {
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 16px;
+          padding: 2rem;
+          border: 2px solid;
+          transition: all 0.3s ease;
+        }
+
+        .result-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fadeIn 0.6s ease-out;
+        }
+
+        .animate-fade-in-delay {
+          animation: fadeIn 0.8s ease-out 0.3s both;
+        }
+
+        .animate-slide-up {
+          animation: slideUp 0.6s ease-out;
+        }
+
+        .animate-slide-up-delay {
+          animation: slideUp 0.6s ease-out 0.2s both;
+        }
+      `}</style>
     </>
   )
 }
