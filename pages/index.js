@@ -831,8 +831,11 @@ export default function TradeCalculator() {
                     <p style={{ color: '#a78bfa', fontSize: '1.125rem', fontWeight: '600' }}>
                       {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
                     </p>
-                    <p style={{ color: '#8b5cf6', fontSize: '1.25rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
-                      Total: {formatNumber(trade.totalLowestPlantDamage)}
+                    <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: '600', marginTop: '0.5rem' }}>
+                      Combined Value: {formatNumber(trade.totalLowestPlantDamage)}
+                    </p>
+                    <p style={{ color: '#9ca3af', fontSize: '0.7rem', marginTop: '0.25rem' }}>
+                      (For reference only - not part of your total)
                     </p>
                   </div>
                 )}
@@ -927,8 +930,11 @@ export default function TradeCalculator() {
                         <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
                           {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
                         </p>
-                        <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                          Total: {formatNumber(trade.totalLowestPlantDamage)}
+                        <p style={{ color: '#8b5cf6', fontSize: '0.95rem', fontWeight: '600', marginTop: '0.25rem' }}>
+                          Combined Value: {formatNumber(trade.totalLowestPlantDamage)}
+                        </p>
+                        <p style={{ color: '#9ca3af', fontSize: '0.65rem', marginTop: '0.15rem' }}>
+                          (Reference - these would be replaced in trades)
                         </p>
                       </div>
                     )}
