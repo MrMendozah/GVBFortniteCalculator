@@ -160,58 +160,85 @@ export default function TradeCalculator() {
     const lowestDamage = parseNumber(lowestPlantDamage)
     const lowestCount = parseNumber(lowestPlantCount)
     
-    // Calculate what you're giving away
-    let p1GivingFromBase = 0
-    let p1GivingFromInventory = 0
+    // Separate what you're trading from base vs inventory
+    let basePlants = []
+    let inventoryPlants = []
     
     player1TradeSlots.forEach((plant, index) => {
       const value = parseNumber(plant)
-      if (player1FromInventory[index]) {
-        p1GivingFromInventory += value
-      } else {
-        p1GivingFromBase += value
+      if (value > 0) {
+        if (player1FromInventory[index]) {
+          inventoryPlants.push(value)
+        } else {
+          basePlants.push(value)
+        }
       }
     })
     
+    const p1GivingFromBase = basePlants.reduce((sum, val) => sum + val, 0)
+    const p1GivingFromInventory = inventoryPlants.reduce((sum, val) => sum + val, 0)
     const p1TotalGiving = p1GivingFromBase + p1GivingFromInventory
     
-    // Calculate what you're receiving and the replacement gain
-    const receivedPlants = player2TradeSlots.filter(plant => parseNumber(plant) > 0)
-    const p2Giving = receivedPlants.reduce((sum, plant) => sum + parseNumber(plant), 0)
-    const receivedPlantCount = receivedPlants.length
+    // Get received plants
+    const receivedPlants = player2TradeSlots
+      .map(plant => parseNumber(plant))
+      .filter(val => val > 0)
+      .sort((a, b) => b - a) // Sort descending
     
-    // Calculate replacement gain: received plants replace lowest plants
-    let actualReceivingGain = 0
+    const p2Giving = receivedPlants.reduce((sum, val) => sum + val, 0)
+    
+    // Calculate the actual gain
+    let netChange = 0
     let replacementDetails = []
     
-    if (lowestDamage > 0 && receivedPlantCount > 0) {
-      // Each received plant replaces a lowest plant
-      receivedPlants.forEach(plant => {
-        const receivedValue = parseNumber(plant)
-        const gainPerPlant = receivedValue - lowestDamage
-        actualReceivingGain += gainPerPlant
+    // Step 1: First, received plants fill the slots of plants traded from base
+    let receivedIndex = 0
+    basePlants.sort((a, b) => b - a) // Sort descending
+    
+    for (let i = 0; i < basePlants.length && receivedIndex < receivedPlants.length; i++) {
+      const tradedValue = basePlants[i]
+      const receivedValue = receivedPlants[receivedIndex]
+      const gain = receivedValue - tradedValue
+      
+      netChange += gain
+      replacementDetails.push({
+        type: 'slot',
+        received: receivedValue,
+        replaced: tradedValue,
+        gain: gain
+      })
+      receivedIndex++
+    }
+    
+    // Step 2: Remaining received plants replace lowest plants (if better)
+    for (let i = receivedIndex; i < receivedPlants.length; i++) {
+      const receivedValue = receivedPlants[i]
+      
+      if (lowestDamage > 0 && receivedValue > lowestDamage) {
+        const gain = receivedValue - lowestDamage
+        netChange += gain
         replacementDetails.push({
+          type: 'lowest',
           received: receivedValue,
           replaced: lowestDamage,
-          gain: gainPerPlant
+          gain: gain
         })
-      })
-    } else {
-      // If no lowest plant data, assume full value is gained
-      actualReceivingGain = p2Giving
+      } else {
+        // Plant is worse than or equal to lowest, no gain
+        replacementDetails.push({
+          type: 'none',
+          received: receivedValue,
+          replaced: lowestDamage || 0,
+          gain: 0
+        })
+      }
     }
     
     // Calculate total plant damage for lowest plants
     const totalLowestPlantDamage = lowestDamage * lowestCount
     
-    // Calculate raw difference (what you receive vs what you give)
+    // Calculate raw difference
     const rawDifference = p2Giving - p1TotalGiving
-    
-    // Net change calculation
-    // From inventory: ADD (removing from storage adds to base)
-    // From base: SUBTRACT (trading away reduces base)
-    // Receiving: ADD the actual gain (replacement difference)
-    const netChange = p1GivingFromInventory - p1GivingFromBase + actualReceivingGain
     
     // New total after trade
     const p1NewTotal = p1Total + netChange
@@ -220,13 +247,13 @@ export default function TradeCalculator() {
       p1NewTotal,
       netChange,
       rawDifference,
-      actualReceivingGain,
       p1IsGood: netChange > 0,
       p1TotalGiving,
       p1GivingFromBase,
       p1GivingFromInventory,
       p2Giving,
-      receivedPlantCount,
+      receivedPlantCount: receivedPlants.length,
+      basePlantCount: basePlants.length,
       replacementDetails,
       totalLowestPlantDamage,
       lowestDamage,
@@ -348,7 +375,7 @@ export default function TradeCalculator() {
                         type="text"
                         value={lowestPlantDamage}
                         onChange={(e) => setLowestPlantDamage(e.target.value)}
-                        placeholder="e.g., 700k"
+                        placeholder="e.g., 510k"
                         className="input-field"
                       />
                     </div>
@@ -467,14 +494,14 @@ export default function TradeCalculator() {
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                     {trade.p1GivingFromInventory > 0 && (
                       <div style={{ fontSize: '0.75rem', color: '#a78bfa', marginBottom: '0.5rem' }}>
-                        <p>✓ From Inventory: {formatNumber(trade.p1GivingFromInventory)}</p>
-                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>(Adds to base)</p>
+                        <p>⚡ From Inventory: {formatNumber(trade.p1GivingFromInventory)}</p>
+                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>(Not counted in base)</p>
                       </div>
                     )}
                     {trade.p1GivingFromBase > 0 && (
                       <div style={{ fontSize: '0.75rem', color: '#f87171' }}>
                         <p>✗ From Base: {formatNumber(trade.p1GivingFromBase)}</p>
-                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>(Reduces base)</p>
+                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({trade.basePlantCount} plant{trade.basePlantCount > 1 ? 's' : ''} creating {trade.basePlantCount} slot{trade.basePlantCount > 1 ? 's' : ''})</p>
                       </div>
                     )}
                   </div>
@@ -484,25 +511,40 @@ export default function TradeCalculator() {
                     {formatNumber(trade.p2Giving)}
                   </p>
 
-                  {/* Replacement Gain Breakdown */}
-                  {trade.lowestDamage > 0 && trade.receivedPlantCount > 0 && (
+                  {/* Replacement Breakdown */}
+                  {trade.replacementDetails.length > 0 && (
                     <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                       <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.75rem' }}>
-                        Plant Replacement ({trade.receivedPlantCount} plants)
+                        Plant Replacement Breakdown
                       </p>
                       {trade.replacementDetails.map((detail, idx) => (
                         <div key={idx} style={{ fontSize: '0.7rem', color: '#9ca3af', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                          <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
-                            {formatNumber(detail.received)} - {formatNumber(detail.replaced)} = 
-                            <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
-                              {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
-                            </span>
-                          </p>
+                          {detail.type === 'slot' && (
+                            <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
+                              {formatNumber(detail.received)} fills {formatNumber(detail.replaced)} slot = 
+                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
+                                {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
+                              </span>
+                            </p>
+                          )}
+                          {detail.type === 'lowest' && (
+                            <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
+                              {formatNumber(detail.received)} replaces lowest ({formatNumber(detail.replaced)}) = 
+                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
+                                {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
+                              </span>
+                            </p>
+                          )}
+                          {detail.type === 'none' && (
+                            <p style={{ color: '#9ca3af' }}>
+                              {formatNumber(detail.received)} ≤ lowest ({formatNumber(detail.replaced)}) = 
+                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem', color: '#9ca3af' }}>
+                                +0 (not added)
+                              </span>
+                            </p>
+                          )}
                         </div>
                       ))}
-                      <p style={{ color: '#22c55e', fontSize: '0.875rem', fontWeight: 'bold', marginTop: '0.75rem' }}>
-                        Actual Gain: {trade.actualReceivingGain >= 0 ? '+' : ''}{formatNumber(trade.actualReceivingGain)}
-                      </p>
                     </div>
                   )}
 
@@ -558,9 +600,14 @@ export default function TradeCalculator() {
                       {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
                     </p>
                     <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.4' }}>
-                      {trade.p1GivingFromInventory > 0 && <p>+{formatNumber(trade.p1GivingFromInventory)} (from inventory)</p>}
-                      {trade.p1GivingFromBase > 0 && <p>-{formatNumber(trade.p1GivingFromBase)} (from base)</p>}
-                      {trade.actualReceivingGain > 0 && <p>+{formatNumber(trade.actualReceivingGain)} (replacement gain)</p>}
+                      {trade.replacementDetails.map((detail, idx) => (
+                        <p key={idx}>
+                          {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)} 
+                          {detail.type === 'slot' && ' (slot fill)'}
+                          {detail.type === 'lowest' && ' (lowest replace)'}
+                          {detail.type === 'none' && ' (below lowest)'}
+                        </p>
+                      ))}
                     </div>
                   </div>
                   
