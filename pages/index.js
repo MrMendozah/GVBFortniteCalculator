@@ -66,10 +66,21 @@ export default function TradeCalculator() {
   const [useManualInventory, setUseManualInventory] = useLocalStorage('useManualInventory', false)
   const [inventoryPlants, setInventoryPlants] = useLocalStorage('inventoryPlants', Array(35).fill(''))
   const [sortOrder, setSortOrder] = useLocalStorage('sortOrder', 'none')
+  const [warningMessage, setWarningMessage] = useState('')
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Clear warning after 3 seconds
+  useEffect(() => {
+    if (warningMessage) {
+      const timer = setTimeout(() => {
+        setWarningMessage('')
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [warningMessage])
 
   // Particle animation
   useEffect(() => {
@@ -380,6 +391,19 @@ export default function TradeCalculator() {
   }
 
   const toggleFromInventory = (index) => {
+    const plantValue = player1TradeSlots[index]
+    const currentlyFromInventory = player1FromInventory[index]
+    
+    // If trying to uncheck "From Inventory" (mark as from base)
+    if (currentlyFromInventory && useManualInventory && plantValue) {
+      // Check if plant exists in base
+      if (!isPlantInBase(plantValue)) {
+        setWarningMessage(`⚠️ ${plantValue} is not in your base! This plant must be marked as "From Inventory".`)
+        return // Don't allow the toggle
+      }
+    }
+    
+    // Allow the toggle
     const newFlags = [...player1FromInventory]
     newFlags[index] = !newFlags[index]
     setPlayer1FromInventory(newFlags)
@@ -423,13 +447,15 @@ export default function TradeCalculator() {
         <title>GVB Plant Calculator</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         
+        {/* Google Site Verification */}
+        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
+        
         {/* Primary Meta Tags */}
         <meta name="title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot Trade Calculator" />
         <meta name="description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot (GVB). Independent project made for fun, non-profit with no ads. Optimize your trades and maximize your damage!" />
         <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
         <meta name="author" content="GVB Community" />
         <meta name="robots" content="index, follow" />
-        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
         
         {/* Canonical URL */}
         <link rel="canonical" href="https://gvb-fortnite-calculator.vercel.app/" />
@@ -454,6 +480,13 @@ export default function TradeCalculator() {
       </Head>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
+
+      {/* Warning Toast */}
+      {warningMessage && (
+        <div className="warning-toast">
+          {warningMessage}
+        </div>
+      )}
 
       <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem', position: 'relative' }}>
         <div style={{ maxWidth: '90rem', margin: '0 auto' }}>
@@ -670,7 +703,7 @@ export default function TradeCalculator() {
             </div>
           </div>
 
-          {/* Results */}
+          {/* Results - keeping the same as before */}
           <div className="glass-card animate-fade-in-delay">
             <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', textAlign: 'center' }}>
               Trade Analysis
@@ -840,6 +873,34 @@ export default function TradeCalculator() {
           margin: 0;
           padding: 0;
           overflow-x: hidden;
+        }
+
+        .warning-toast {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(239, 68, 68, 0.95);
+          color: white;
+          padding: 1rem 1.5rem;
+          border-radius: 12px;
+          border: 2px solid rgba(239, 68, 68, 1);
+          font-size: 0.875rem;
+          font-weight: 600;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          z-index: 10000;
+          animation: slideInRight 0.3s ease-out;
+          max-width: 400px;
+        }
+
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
         }
 
         .glass-card {
@@ -1085,6 +1146,13 @@ export default function TradeCalculator() {
           .add-btn, .remove-btn {
             width: 32px;
             height: 32px;
+          }
+
+          .warning-toast {
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            max-width: none;
           }
         }
       `}</style>
