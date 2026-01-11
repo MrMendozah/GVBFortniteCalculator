@@ -27,37 +27,38 @@ const formatNumber = (num) => {
 // Custom hook for localStorage with SSR safety
 const useLocalStorage = (key, initialValue) => {
   const [storedValue, setStoredValue] = useState(initialValue)
-  const [firstLoadDone, setFirstLoadDone] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const item = window.localStorage.getItem(key)
-        if (item) {
-          setStoredValue(JSON.parse(item))
-        }
-      } catch (error) {
-        console.error('Error loading from localStorage:', error)
+    // Only run on client side
+    try {
+      const item = window.localStorage.getItem(key)
+      if (item) {
+        setStoredValue(JSON.parse(item))
       }
-      setFirstLoadDone(true)
+    } catch (error) {
+      console.error('Error loading from localStorage:', error)
     }
+    setIsLoaded(true)
   }, [key])
 
   useEffect(() => {
-    if (firstLoadDone && typeof window !== 'undefined') {
+    // Only save after initial load
+    if (isLoaded) {
       try {
         window.localStorage.setItem(key, JSON.stringify(storedValue))
       } catch (error) {
         console.error('Error saving to localStorage:', error)
       }
     }
-  }, [storedValue, firstLoadDone, key])
+  }, [storedValue, isLoaded, key])
 
   return [storedValue, setStoredValue]
 }
 
 export default function TradeCalculator() {
   const canvasRef = useRef(null)
+  const [isMounted, setIsMounted] = useState(false)
   const [player1Total, setPlayer1Total] = useLocalStorage('player1Total', '')
   const [player1TradeSlots, setPlayer1TradeSlots] = useLocalStorage('player1TradeSlots', ['', '', '', '', '', ''])
   const [player1FromInventory, setPlayer1FromInventory] = useLocalStorage('player1FromInventory', [false, false, false, false, false, false])
@@ -67,8 +68,15 @@ export default function TradeCalculator() {
   const [useManualInventory, setUseManualInventory] = useLocalStorage('useManualInventory', false)
   const [inventoryPlants, setInventoryPlants] = useLocalStorage('inventoryPlants', Array(35).fill(''))
 
+  // Set mounted state
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   // Particle animation
   useEffect(() => {
+    if (!isMounted) return
+    
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -149,7 +157,7 @@ export default function TradeCalculator() {
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [isMounted])
 
   // Calculate trade outcome
   const calculateTrade = () => {
@@ -162,13 +170,13 @@ export default function TradeCalculator() {
     
     // Separate what you're trading from base vs inventory
     let basePlants = []
-    let inventoryPlants = []
+    let inventoryPlantsGiven = []
     
     player1TradeSlots.forEach((plant, index) => {
       const value = parseNumber(plant)
       if (value > 0) {
         if (player1FromInventory[index]) {
-          inventoryPlants.push(value)
+          inventoryPlantsGiven.push(value)
         } else {
           basePlants.push(value)
         }
@@ -176,7 +184,7 @@ export default function TradeCalculator() {
     })
     
     const p1GivingFromBase = basePlants.reduce((sum, val) => sum + val, 0)
-    const p1GivingFromInventory = inventoryPlants.reduce((sum, val) => sum + val, 0)
+    const p1GivingFromInventory = inventoryPlantsGiven.reduce((sum, val) => sum + val, 0)
     const p1TotalGiving = p1GivingFromBase + p1GivingFromInventory
     
     // Get received plants
@@ -301,6 +309,11 @@ export default function TradeCalculator() {
     setPlayer2TradeSlots(['', '', '', '', '', ''])
   }
 
+  // Don't render until mounted (prevents SSR issues)
+  if (!isMounted) {
+    return null
+  }
+
   return (
     <>
       <Head>
@@ -365,7 +378,7 @@ export default function TradeCalculator() {
                     />
                   </div>
 
-                  {/* Lowest Plant Info - Only show when NOT using manual inventory */}
+                  {/* Lowest Plant Info */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div>
                       <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
@@ -486,7 +499,7 @@ export default function TradeCalculator() {
               {/* Trade Summary */}
               <div className="result-card" style={{ borderColor: '#8b5cf6' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Trading (Total)</p>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You&apos;re Trading (Total)</p>
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p1TotalGiving)}
                   </p>
@@ -506,7 +519,7 @@ export default function TradeCalculator() {
                     )}
                   </div>
                   
-                  <p style={{ color: '#d1d5db', marginTop: '1rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Receiving (Total Value)</p>
+                  <p style={{ color: '#d1d5db', marginTop: '1rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You&apos;re Receiving (Total Value)</p>
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p2Giving)}
                   </p>
