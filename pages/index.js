@@ -168,7 +168,7 @@ export default function TradeCalculator() {
     return indexed
   }
 
-  // Add plant to trade slot
+  // Add plant to trade slot (only add one instance)
   const addToTrade = (plantValue) => {
     const emptyIndex = player1TradeSlots.findIndex(slot => !slot || slot === '')
     if (emptyIndex !== -1) {
@@ -177,7 +177,7 @@ export default function TradeCalculator() {
       setPlayer1TradeSlots(newSlots)
       
       const newFlags = [...player1FromInventory]
-      newFlags[emptyIndex] = true
+      newFlags[emptyIndex] = false // From base, not inventory
       setPlayer1FromInventory(newFlags)
     }
   }
@@ -193,24 +193,43 @@ export default function TradeCalculator() {
     setPlayer1FromInventory(newFlags)
   }
 
-  // Check if plant is in trade
-  const isInTrade = (plantValue) => {
+  // Count how many times this value appears in trade slots
+  const countInTrade = (plantValue) => {
+    if (!plantValue) return 0
+    return player1TradeSlots.filter(slot => slot === plantValue).length
+  }
+
+  // Count how many times this value appears in inventory
+  const countInInventory = (plantValue) => {
+    if (!plantValue) return 0
+    return inventoryPlants.filter(plant => plant === plantValue).length
+  }
+
+  // Can add more of this plant to trade?
+  const canAddToTrade = (plantValue) => {
     if (!plantValue) return false
-    return player1TradeSlots.includes(plantValue)
+    const inTrade = countInTrade(plantValue)
+    const inInventory = countInInventory(plantValue)
+    const hasEmptySlot = player1TradeSlots.some(slot => !slot || slot === '')
+    return hasEmptySlot && inTrade < inInventory
   }
 
   // Calculate trade outcome
   const calculateTrade = () => {
-    const calculatedTotal = inventoryPlants.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    // Get base plants (excluding those marked as "from inventory" in trade slots)
+    const basePlantsList = useManualInventory ? inventoryPlants.filter(p => parseNumber(p) > 0) : []
+    
+    // Calculate total
+    const calculatedTotal = basePlantsList.reduce((sum, plant) => sum + parseNumber(plant), 0)
     const p1Total = useManualInventory ? calculatedTotal : parseNumber(player1Total)
     
     let lowestDamage = 0
     let lowestCount = 0
     
     if (useManualInventory) {
-      const plantValues = inventoryPlants
+      // Auto-detect from base plants
+      const plantValues = basePlantsList
         .map(plant => parseNumber(plant))
-        .filter(val => val > 0)
         .sort((a, b) => a - b)
       
       if (plantValues.length > 0) {
@@ -218,10 +237,17 @@ export default function TradeCalculator() {
         lowestCount = plantValues.filter(val => val === lowestDamage).length
       }
     } else {
-      lowestDamage = parseNumber(lowestPlantDamage)
+      // Use manual input with random variation
+      const baseLowest = parseNumber(lowestPlantDamage)
+      if (baseLowest > 0) {
+        // Random variation: if lowest is 500k, actual could be 500k-599k
+        const variation = Math.floor(baseLowest * 0.2) // 20% variation max (e.g., 500k -> up to 600k)
+        lowestDamage = baseLowest + Math.floor(Math.random() * variation)
+      }
       lowestCount = parseNumber(lowestPlantCount)
     }
     
+    // Separate what you're trading from base vs inventory
     let basePlants = []
     let inventoryPlantsGiven = []
     
@@ -240,6 +266,7 @@ export default function TradeCalculator() {
     const p1GivingFromInventory = inventoryPlantsGiven.reduce((sum, val) => sum + val, 0)
     const p1TotalGiving = p1GivingFromBase + p1GivingFromInventory
     
+    // Get received plants
     const receivedPlants = player2TradeSlots
       .map(plant => parseNumber(plant))
       .filter(val => val > 0)
@@ -247,27 +274,37 @@ export default function TradeCalculator() {
     
     const p2Giving = receivedPlants.reduce((sum, val) => sum + val, 0)
     
+    // Calculate the actual gain
     let netChange = 0
     let replacementDetails = []
     
+    // Step 1: Match received plants with traded base plants
     let receivedIndex = 0
     basePlants.sort((a, b) => b - a)
     
     for (let i = 0; i < basePlants.length && receivedIndex < receivedPlants.length; i++) {
       const tradedValue = basePlants[i]
       const receivedValue = receivedPlants[receivedIndex]
+      
+      // Check if the traded plant is one of the lowest
+      const isLowestPlant = useManualInventory 
+        ? (lowestDamage > 0 && tradedValue === lowestDamage)
+        : (lowestDamage > 0 && tradedValue >= parseNumber(lowestPlantDamage) && tradedValue < parseNumber(lowestPlantDamage) * 1.2)
+      
       const gain = receivedValue - tradedValue
       
       netChange += gain
       replacementDetails.push({
-        type: 'slot',
+        type: isLowestPlant ? 'lowest-slot' : 'slot',
         received: receivedValue,
         replaced: tradedValue,
-        gain: gain
+        gain: gain,
+        wasLowest: isLowestPlant
       })
       receivedIndex++
     }
     
+    // Step 2: Remaining received plants replace lowest plants (if better)
     for (let i = receivedIndex; i < receivedPlants.length; i++) {
       const receivedValue = receivedPlants[i]
       
@@ -278,14 +315,16 @@ export default function TradeCalculator() {
           type: 'lowest',
           received: receivedValue,
           replaced: lowestDamage,
-          gain: gain
+          gain: gain,
+          wasLowest: false
         })
       } else {
         replacementDetails.push({
           type: 'none',
           received: receivedValue,
           replaced: lowestDamage || 0,
-          gain: 0
+          gain: 0,
+          wasLowest: false
         })
       }
     }
@@ -359,8 +398,36 @@ export default function TradeCalculator() {
   return (
     <>
       <Head>
-        <title>GVB Fortnite Trade Calculator</title>
+        <title>GVB Plant Calculator</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        
+        {/* Primary Meta Tags */}
+        <meta name="title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot Trade Calculator" />
+        <meta name="description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot (GVB). Independent project made for fun, non-profit with no ads. Optimize your trades and maximize your damage!" />
+        <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
+        <meta name="author" content="GVB Community" />
+        <meta name="robots" content="index, follow" />
+        
+        {/* Canonical URL */}
+        <link rel="canonical" href="https://gvb-fortnite-calculator.vercel.app/" />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://gvb-fortnite-calculator.vercel.app/" />
+        <meta property="og:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
+        <meta property="og:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        <meta property="og:site_name" content="GVB Plant Calculator" />
+        
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
+        <meta property="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
+        <meta property="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        
+        {/* Additional Meta Tags */}
+        <meta name="theme-color" content="#581c87" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </Head>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -400,7 +467,7 @@ export default function TradeCalculator() {
                     onChange={(e) => setUseManualInventory(e.target.checked)}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  Track all 35 plants manually (auto-detects lowest)
+                  Add all 35 plants manually (more accurate)
                 </label>
               </div>
 
@@ -429,9 +496,12 @@ export default function TradeCalculator() {
                         type="text"
                         value={lowestPlantDamage}
                         onChange={(e) => setLowestPlantDamage(e.target.value)}
-                        placeholder="e.g., 510k"
+                        placeholder="e.g., 500k"
                         className="input-field"
                       />
+                      <p style={{ color: '#9ca3af', fontSize: '0.65rem', marginTop: '0.25rem' }}>
+                        Actual range: {lowestPlantDamage ? `${lowestPlantDamage}-${formatNumber(parseNumber(lowestPlantDamage) * 1.2)}` : '500k-600k'}
+                      </p>
                     </div>
                     <div>
                       <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
@@ -451,7 +521,7 @@ export default function TradeCalculator() {
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600' }}>
-                      All 35 Plants Inventory
+                      35 Plants on Base
                       <span style={{ marginLeft: '0.5rem', color: '#a78bfa', fontSize: '0.875rem' }}>
                         (Total: {formatNumber(trade.p1Total)})
                       </span>
@@ -490,11 +560,11 @@ export default function TradeCalculator() {
                           {plant && parseNumber(plant) > 0 && (
                             <button
                               onClick={() => addToTrade(plant)}
-                              disabled={isInTrade(plant)}
+                              disabled={!canAddToTrade(plant)}
                               className="add-btn"
-                              title="Add to trade"
+                              title={canAddToTrade(plant) ? "Add to trade" : "All added or slots full"}
                             >
-                              {isInTrade(plant) ? '✓' : '+'}
+                              {canAddToTrade(plant) ? '+' : '✓'}
                             </button>
                           )}
                         </div>
@@ -528,17 +598,15 @@ export default function TradeCalculator() {
                         ×
                       </button>
                     )}
-                    {!useManualInventory && (
-                      <label style={{ color: '#d1d5db', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={player1FromInventory[index]}
-                          onChange={() => toggleFromInventory(index)}
-                          style={{ width: '14px', height: '14px', cursor: 'pointer' }}
-                        />
-                        From Inventory
-                      </label>
-                    )}
+                    <label style={{ color: '#d1d5db', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={player1FromInventory[index]}
+                        onChange={() => toggleFromInventory(index)}
+                        style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                      />
+                      From Inventory
+                    </label>
                   </div>
                 ))}
               </div>
@@ -616,9 +684,10 @@ export default function TradeCalculator() {
                       </p>
                       {trade.replacementDetails.map((detail, idx) => (
                         <div key={idx} style={{ fontSize: '0.7rem', color: '#9ca3af', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                          {detail.type === 'slot' && (
+                          {(detail.type === 'slot' || detail.type === 'lowest-slot') && (
                             <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
-                              {formatNumber(detail.received)} fills {formatNumber(detail.replaced)} slot = 
+                              {formatNumber(detail.received)} fills {formatNumber(detail.replaced)} slot
+                              {detail.wasLowest && <span style={{ color: '#fbbf24' }}> (was lowest!)</span>} = 
                               <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
                                 {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
                               </span>
@@ -679,7 +748,7 @@ export default function TradeCalculator() {
               <div className="result-card" style={{ borderColor: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ color: '#d1d5db', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                    {useManualInventory ? 'Current Total (From Inventory)' : 'Current Total'}
+                    {useManualInventory ? 'Current Total (From Base)' : 'Current Total'}
                   </p>
                   <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p1Total)}
@@ -700,6 +769,7 @@ export default function TradeCalculator() {
                         <p key={idx}>
                           {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)} 
                           {detail.type === 'slot' && ' (slot fill)'}
+                          {detail.type === 'lowest-slot' && ' (lowest slot fill)'}
                           {detail.type === 'lowest' && ' (lowest replace)'}
                           {detail.type === 'none' && ' (below lowest)'}
                         </p>
@@ -856,6 +926,9 @@ export default function TradeCalculator() {
         .add-btn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+          background: rgba(139, 92, 246, 0.2);
+          border-color: rgba(139, 92, 246, 0.5);
+          color: #a78bfa;
         }
 
         .remove-btn {
