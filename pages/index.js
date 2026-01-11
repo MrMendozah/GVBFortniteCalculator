@@ -167,10 +167,47 @@ export default function TradeCalculator() {
     return () => window.removeEventListener('resize', handleResize)
   }, [isMounted])
 
-  // Check if a plant value exists in base
-  const isPlantInBase = (plantValue) => {
+  // Get which inventory plants are currently used in trades (not from inventory)
+  const getUsedInventoryIndices = () => {
+    const used = new Set()
+    
+    player1TradeSlots.forEach((slot, slotIdx) => {
+      if (slot && !player1FromInventory[slotIdx]) {
+        // Find first unused inventory plant with this value
+        const plantIndices = inventoryPlants
+          .map((plant, idx) => ({ plant, idx }))
+          .filter(({ plant }) => plant === slot)
+          .map(({ idx }) => idx)
+        
+        for (const idx of plantIndices) {
+          if (!used.has(idx)) {
+            used.add(idx)
+            break
+          }
+        }
+      }
+    })
+    
+    return used
+  }
+
+  // Check if this inventory plant is being used in trade
+  const isInventoryPlantUsed = (plantValue, plantIndex) => {
     if (!plantValue || !useManualInventory) return false
-    return inventoryPlants.some(plant => plant === plantValue)
+    const usedIndices = getUsedInventoryIndices()
+    return usedIndices.has(plantIndex)
+  }
+
+  // Check if a plant value exists in base (and has unused instances)
+  const hasAvailableInBase = (plantValue) => {
+    if (!plantValue || !useManualInventory) return false
+    
+    const totalInBase = inventoryPlants.filter(plant => plant === plantValue).length
+    const usedInTrade = player1TradeSlots.filter((slot, idx) => 
+      slot === plantValue && !player1FromInventory[idx]
+    ).length
+    
+    return totalInBase > usedInTrade
   }
 
   // Get sorted inventory for display
@@ -380,7 +417,7 @@ export default function TradeCalculator() {
       // Auto-detect if from inventory
       if (value && useManualInventory) {
         const newFlags = [...player1FromInventory]
-        newFlags[index] = !isPlantInBase(value)
+        newFlags[index] = !hasAvailableInBase(value)
         setPlayer1FromInventory(newFlags)
       }
     } else {
@@ -396,9 +433,9 @@ export default function TradeCalculator() {
     
     // If trying to uncheck "From Inventory" (mark as from base)
     if (currentlyFromInventory && useManualInventory && plantValue) {
-      // Check if plant exists in base
-      if (!isPlantInBase(plantValue)) {
-        setWarningMessage(`⚠️ ${plantValue} is not in your base! This plant must be marked as "From Inventory".`)
+      // Check if plant has available instances in base
+      if (!hasAvailableInBase(plantValue)) {
+        setWarningMessage(`⚠️ ${plantValue} is not available in your base! All instances are already used or it doesn't exist.`)
         return // Don't allow the toggle
       }
     }
@@ -411,17 +448,51 @@ export default function TradeCalculator() {
 
   const updateInventoryPlant = (index, value) => {
     const newPlants = [...inventoryPlants]
+    const oldValue = newPlants[index]
     newPlants[index] = value
     setInventoryPlants(newPlants)
     
-    // Update trade slots that have this value - mark them as from base
-    player1TradeSlots.forEach((slot, slotIndex) => {
-      if (slot === value) {
-        const newFlags = [...player1FromInventory]
-        newFlags[slotIndex] = false // It's now in base, so not from inventory
-        setPlayer1FromInventory(newFlags)
+    // If the value changed, update trade slots that were using this specific inventory plant
+    if (oldValue !== value) {
+      // Update any trade slot that's using this inventory index
+      const usedIndices = getUsedInventoryIndices()
+      if (usedIndices.has(index)) {
+        // Find which trade slot is using this inventory plant
+        let foundSlot = -1
+        const tempUsed = new Set()
+        
+        for (let slotIdx = 0; slotIdx < player1TradeSlots.length; slotIdx++) {
+          const slot = player1TradeSlots[slotIdx]
+          if (slot && !player1FromInventory[slotIdx] && slot === oldValue) {
+            // Find if this slot is using our specific index
+            const plantIndices = inventoryPlants
+              .map((plant, idx) => ({ plant, idx }))
+              .filter(({ plant }) => plant === oldValue)
+              .map(({ idx }) => idx)
+            
+            for (const idx of plantIndices) {
+              if (idx === index && !tempUsed.has(idx)) {
+                foundSlot = slotIdx
+                break
+              }
+              if (!tempUsed.has(idx)) {
+                tempUsed.add(idx)
+                break
+              }
+            }
+            
+            if (foundSlot !== -1) break
+          }
+        }
+        
+        // Update that trade slot to the new value
+        if (foundSlot !== -1 && value) {
+          const newSlots = [...player1TradeSlots]
+          newSlots[foundSlot] = value
+          setPlayer1TradeSlots(newSlots)
+        }
       }
-    })
+    }
   }
 
   const clearPlayer1 = () => {
@@ -603,28 +674,48 @@ export default function TradeCalculator() {
                   
                   <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                      {getSortedInventory().map(({ plant, index }) => (
-                        <div key={index} style={{ position: 'relative' }}>
-                          <input
-                            type="text"
-                            value={plant}
-                            onChange={(e) => updateInventoryPlant(index, e.target.value)}
-                            placeholder={`Plant ${index + 1}`}
-                            className="input-field-small"
-                            style={{ paddingRight: plant && parseNumber(plant) > 0 ? '35px' : '12px' }}
-                          />
-                          {plant && parseNumber(plant) > 0 && (
-                            <button
-                              onClick={() => addToTrade(plant)}
-                              disabled={!canAddToTrade(plant)}
-                              className="add-btn"
-                              title={canAddToTrade(plant) ? "Add to trade" : "All added or slots full"}
-                            >
-                              {canAddToTrade(plant) ? '+' : '✓'}
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      {getSortedInventory().map(({ plant, index }) => {
+                        const isUsed = isInventoryPlantUsed(plant, index)
+                        return (
+                          <div key={index} style={{ position: 'relative', opacity: isUsed ? 0.5 : 1 }}>
+                            <input
+                              type="text"
+                              value={plant}
+                              onChange={(e) => updateInventoryPlant(index, e.target.value)}
+                              placeholder={`Plant ${index + 1}`}
+                              className="input-field-small"
+                              style={{ 
+                                paddingRight: plant && parseNumber(plant) > 0 ? '35px' : '12px',
+                                backgroundColor: isUsed ? 'rgba(107, 114, 128, 0.3)' : 'rgba(255, 255, 255, 0.08)'
+                              }}
+                              disabled={isUsed}
+                            />
+                            {plant && parseNumber(plant) > 0 && !isUsed && (
+                              <button
+                                onClick={() => addToTrade(plant)}
+                                disabled={!canAddToTrade(plant)}
+                                className="add-btn"
+                                title={canAddToTrade(plant) ? "Add to trade" : "All added or slots full"}
+                              >
+                                {canAddToTrade(plant) ? '+' : '✓'}
+                              </button>
+                            )}
+                            {isUsed && (
+                              <span style={{
+                                position: 'absolute',
+                                right: '8px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                fontSize: '0.7rem',
+                                color: '#9ca3af',
+                                fontWeight: '600'
+                              }}>
+                                IN TRADE
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
@@ -703,7 +794,7 @@ export default function TradeCalculator() {
             </div>
           </div>
 
-          {/* Results - keeping the same as before */}
+          {/* Results - Same as before, keeping it unchanged */}
           <div className="glass-card animate-fade-in-delay">
             <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', textAlign: 'center' }}>
               Trade Analysis
@@ -951,6 +1042,11 @@ export default function TradeCalculator() {
           background: rgba(255, 255, 255, 0.12);
           transform: scale(1.02);
           box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+        }
+
+        .input-field-small:disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
         }
 
         .input-field::placeholder,
