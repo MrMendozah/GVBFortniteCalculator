@@ -59,11 +59,12 @@ const useLocalStorage = (key, initialValue) => {
 export default function TradeCalculator() {
   const canvasRef = useRef(null)
   const [player1Total, setPlayer1Total] = useLocalStorage('player1Total', '')
-  const [player1Plants, setPlayer1Plants] = useLocalStorage('player1Plants', Array(35).fill(''))
-  const [player2Plants, setPlayer2Plants] = useLocalStorage('player2Plants', Array(35).fill(''))
+  const [player1TradeSlots, setPlayer1TradeSlots] = useLocalStorage('player1TradeSlots', ['', '', '', '', '', ''])
+  const [player2TradeSlots, setPlayer2TradeSlots] = useLocalStorage('player2TradeSlots', ['', '', '', '', '', ''])
   const [lowestPlantDamage, setLowestPlantDamage] = useLocalStorage('lowestPlantDamage', '')
   const [lowestPlantCount, setLowestPlantCount] = useLocalStorage('lowestPlantCount', '')
-  const [useCalculatedTotal, setUseCalculatedTotal] = useLocalStorage('useCalculatedTotal', false)
+  const [useManualInventory, setUseManualInventory] = useLocalStorage('useManualInventory', false)
+  const [inventoryPlants, setInventoryPlants] = useLocalStorage('inventoryPlants', Array(35).fill(''))
 
   // Particle animation
   useEffect(() => {
@@ -151,15 +152,15 @@ export default function TradeCalculator() {
 
   // Calculate trade outcome
   const calculateTrade = () => {
-    // Calculate total from all plants if checkbox is enabled
-    const calculatedP1Total = player1Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
-    const p1Total = useCalculatedTotal ? calculatedP1Total : parseNumber(player1Total)
+    // Calculate total - either from manual inventory or from input
+    const calculatedTotal = inventoryPlants.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    const p1Total = useManualInventory ? calculatedTotal : parseNumber(player1Total)
     
     const lowestDamage = parseNumber(lowestPlantDamage)
     const lowestCount = parseNumber(lowestPlantCount)
     
-    const p1Giving = player1Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
-    const p2Giving = player2Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    const p1Giving = player1TradeSlots.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    const p2Giving = player2TradeSlots.reduce((sum, plant) => sum + parseNumber(plant), 0)
     
     // Calculate total plant damage for lowest plants
     const totalLowestPlantDamage = lowestDamage * lowestCount
@@ -185,27 +186,34 @@ export default function TradeCalculator() {
 
   const trade = calculateTrade()
 
-  const updatePlant = (player, index, value) => {
+  const updateTradeSlot = (player, index, value) => {
     if (player === 1) {
-      const newPlants = [...player1Plants]
-      newPlants[index] = value
-      setPlayer1Plants(newPlants)
+      const newSlots = [...player1TradeSlots]
+      newSlots[index] = value
+      setPlayer1TradeSlots(newSlots)
     } else {
-      const newPlants = [...player2Plants]
-      newPlants[index] = value
-      setPlayer2Plants(newPlants)
+      const newSlots = [...player2TradeSlots]
+      newSlots[index] = value
+      setPlayer2TradeSlots(newSlots)
     }
   }
 
+  const updateInventoryPlant = (index, value) => {
+    const newPlants = [...inventoryPlants]
+    newPlants[index] = value
+    setInventoryPlants(newPlants)
+  }
+
   const clearPlayer1 = () => {
-    setPlayer1Plants(Array(35).fill(''))
+    setPlayer1TradeSlots(['', '', '', '', '', ''])
     setPlayer1Total('')
     setLowestPlantDamage('')
     setLowestPlantCount('')
+    setInventoryPlants(Array(35).fill(''))
   }
 
   const clearPlayer2 = () => {
-    setPlayer2Plants(Array(35).fill(''))
+    setPlayer2TradeSlots(['', '', '', '', '', ''])
   }
 
   return (
@@ -225,7 +233,7 @@ export default function TradeCalculator() {
               GVB Fortnite Trade Calculator
             </h1>
             <p style={{ color: '#d1d5db', fontSize: '1.125rem' }}>
-              Calculate trades with up to 35 plants • Auto-saves your data
+              Calculate 2x3 plant trades • Track your inventory • Auto-saves your data
             </p>
           </div>
 
@@ -242,20 +250,22 @@ export default function TradeCalculator() {
                   Clear All
                 </button>
               </div>
-              
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+              {/* Inventory Mode Toggle */}
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '12px', border: '2px solid rgba(139, 92, 246, 0.3)' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
-                    checked={useCalculatedTotal}
-                    onChange={(e) => setUseCalculatedTotal(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    checked={useManualInventory}
+                    onChange={(e) => setUseManualInventory(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  Calculate total from all 35 plants below
+                  Track all 35 plants manually for accurate total
                 </label>
               </div>
 
-              {!useCalculatedTotal && (
+              {/* Total Damage Input or Inventory */}
+              {!useManualInventory ? (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
                     Total Base Damage
@@ -268,8 +278,32 @@ export default function TradeCalculator() {
                     className="input-field"
                   />
                 </div>
+              ) : (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
+                    All 35 Plants Inventory
+                    <span style={{ marginLeft: '0.5rem', color: '#a78bfa', fontSize: '0.875rem' }}>
+                      (Total: {formatNumber(trade.p1Total)})
+                    </span>
+                  </label>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                      {inventoryPlants.map((plant, index) => (
+                        <input
+                          key={index}
+                          type="text"
+                          value={plant}
+                          onChange={(e) => updateInventoryPlant(index, e.target.value)}
+                          placeholder={`Plant ${index + 1}`}
+                          className="input-field-small"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
 
+              {/* Lowest Plant Info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
@@ -297,22 +331,21 @@ export default function TradeCalculator() {
                 </div>
               </div>
 
+              {/* Trade Slots */}
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                All 35 Plants Trading Away
+                Plants Trading Away (2x3 Grid)
               </label>
-              <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                  {player1Plants.map((plant, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      value={plant}
-                      onChange={(e) => updatePlant(1, index, e.target.value)}
-                      placeholder={`Plant ${index + 1}`}
-                      className="input-field-small"
-                    />
-                  ))}
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
+                {player1TradeSlots.map((plant, index) => (
+                  <input
+                    key={index}
+                    type="text"
+                    value={plant}
+                    onChange={(e) => updateTradeSlot(1, index, e.target.value)}
+                    placeholder={`Plant ${index + 1}`}
+                    className="input-field-small"
+                  />
+                ))}
               </div>
             </div>
 
@@ -329,21 +362,19 @@ export default function TradeCalculator() {
               </div>
 
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                All 35 Plants Trading to You
+                Plants Trading to You (2x3 Grid)
               </label>
-              <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                  {player2Plants.map((plant, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      value={plant}
-                      onChange={(e) => updatePlant(2, index, e.target.value)}
-                      placeholder={`Plant ${index + 1}`}
-                      className="input-field-small"
-                    />
-                  ))}
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
+                {player2TradeSlots.map((plant, index) => (
+                  <input
+                    key={index}
+                    type="text"
+                    value={plant}
+                    onChange={(e) => updateTradeSlot(2, index, e.target.value)}
+                    placeholder={`Plant ${index + 1}`}
+                    className="input-field-small"
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -386,7 +417,7 @@ export default function TradeCalculator() {
               <div className="result-card" style={{ borderColor: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ color: '#d1d5db', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                    {useCalculatedTotal ? 'Current Total (Calculated)' : 'Current Total'}
+                    {useManualInventory ? 'Current Total (From Inventory)' : 'Current Total'}
                   </p>
                   <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p1Total)}
