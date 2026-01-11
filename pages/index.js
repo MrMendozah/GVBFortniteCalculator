@@ -60,6 +60,7 @@ export default function TradeCalculator() {
   const canvasRef = useRef(null)
   const [player1Total, setPlayer1Total] = useLocalStorage('player1Total', '')
   const [player1TradeSlots, setPlayer1TradeSlots] = useLocalStorage('player1TradeSlots', ['', '', '', '', '', ''])
+  const [player1FromInventory, setPlayer1FromInventory] = useLocalStorage('player1FromInventory', [false, false, false, false, false, false])
   const [player2TradeSlots, setPlayer2TradeSlots] = useLocalStorage('player2TradeSlots', ['', '', '', '', '', ''])
   const [lowestPlantDamage, setLowestPlantDamage] = useLocalStorage('lowestPlantDamage', '')
   const [lowestPlantCount, setLowestPlantCount] = useLocalStorage('lowestPlantCount', '')
@@ -159,14 +160,30 @@ export default function TradeCalculator() {
     const lowestDamage = parseNumber(lowestPlantDamage)
     const lowestCount = parseNumber(lowestPlantCount)
     
-    const p1Giving = player1TradeSlots.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    // Calculate what you're giving away
+    let p1GivingFromBase = 0
+    let p1GivingFromInventory = 0
+    
+    player1TradeSlots.forEach((plant, index) => {
+      const value = parseNumber(plant)
+      if (player1FromInventory[index]) {
+        p1GivingFromInventory += value
+      } else {
+        p1GivingFromBase += value
+      }
+    })
+    
+    const p1TotalGiving = p1GivingFromBase + p1GivingFromInventory
     const p2Giving = player2TradeSlots.reduce((sum, plant) => sum + parseNumber(plant), 0)
     
     // Calculate total plant damage for lowest plants
     const totalLowestPlantDamage = lowestDamage * lowestCount
     
     // Net change calculation
-    const netChange = p2Giving - p1Giving
+    // From inventory: ADD (you're removing from inventory, so it adds to base)
+    // From base: SUBTRACT (you're trading away from base)
+    // Receiving: ADD (you're getting plants)
+    const netChange = p1GivingFromInventory - p1GivingFromBase + p2Giving
     
     // New total after trade
     const p1NewTotal = p1Total + netChange
@@ -175,7 +192,9 @@ export default function TradeCalculator() {
       p1NewTotal,
       netChange,
       p1IsGood: netChange > 0,
-      p1Giving,
+      p1TotalGiving,
+      p1GivingFromBase,
+      p1GivingFromInventory,
       p2Giving,
       totalLowestPlantDamage,
       lowestDamage,
@@ -198,6 +217,12 @@ export default function TradeCalculator() {
     }
   }
 
+  const toggleFromInventory = (index) => {
+    const newFlags = [...player1FromInventory]
+    newFlags[index] = !newFlags[index]
+    setPlayer1FromInventory(newFlags)
+  }
+
   const updateInventoryPlant = (index, value) => {
     const newPlants = [...inventoryPlants]
     newPlants[index] = value
@@ -206,6 +231,7 @@ export default function TradeCalculator() {
 
   const clearPlayer1 = () => {
     setPlayer1TradeSlots(['', '', '', '', '', ''])
+    setPlayer1FromInventory([false, false, false, false, false, false])
     setPlayer1Total('')
     setLowestPlantDamage('')
     setLowestPlantCount('')
@@ -266,18 +292,48 @@ export default function TradeCalculator() {
 
               {/* Total Damage Input or Inventory */}
               {!useManualInventory ? (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
-                    Total Base Damage
-                  </label>
-                  <input
-                    type="text"
-                    value={player1Total}
-                    onChange={(e) => setPlayer1Total(e.target.value)}
-                    placeholder="e.g., 21.3mil or 100k"
-                    className="input-field"
-                  />
-                </div>
+                <>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                      Total Base Damage
+                    </label>
+                    <input
+                      type="text"
+                      value={player1Total}
+                      onChange={(e) => setPlayer1Total(e.target.value)}
+                      placeholder="e.g., 21.3mil or 100k"
+                      className="input-field"
+                    />
+                  </div>
+
+                  {/* Lowest Plant Info - Only show when NOT using manual inventory */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                      <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                        Lowest Plant Damage
+                      </label>
+                      <input
+                        type="text"
+                        value={lowestPlantDamage}
+                        onChange={(e) => setLowestPlantDamage(e.target.value)}
+                        placeholder="e.g., 700k"
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                        # of Lowest Plants
+                      </label>
+                      <input
+                        type="text"
+                        value={lowestPlantCount}
+                        onChange={(e) => setLowestPlantCount(e.target.value)}
+                        placeholder="e.g., 35"
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
@@ -303,48 +359,30 @@ export default function TradeCalculator() {
                 </div>
               )}
 
-              {/* Lowest Plant Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
-                    Lowest Plant Damage
-                  </label>
-                  <input
-                    type="text"
-                    value={lowestPlantDamage}
-                    onChange={(e) => setLowestPlantDamage(e.target.value)}
-                    placeholder="e.g., 700k"
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
-                    # of Lowest Plants
-                  </label>
-                  <input
-                    type="text"
-                    value={lowestPlantCount}
-                    onChange={(e) => setLowestPlantCount(e.target.value)}
-                    placeholder="e.g., 35"
-                    className="input-field"
-                  />
-                </div>
-              </div>
-
               {/* Trade Slots */}
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
                 Plants Trading Away (2x3 Grid)
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
                 {player1TradeSlots.map((plant, index) => (
-                  <input
-                    key={index}
-                    type="text"
-                    value={plant}
-                    onChange={(e) => updateTradeSlot(1, index, e.target.value)}
-                    placeholder={`Plant ${index + 1}`}
-                    className="input-field-small"
-                  />
+                  <div key={index}>
+                    <input
+                      type="text"
+                      value={plant}
+                      onChange={(e) => updateTradeSlot(1, index, e.target.value)}
+                      placeholder={`Plant ${index + 1}`}
+                      className="input-field-small"
+                    />
+                    <label style={{ color: '#d1d5db', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={player1FromInventory[index]}
+                        onChange={() => toggleFromInventory(index)}
+                        style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                      />
+                      From Inventory
+                    </label>
+                  </div>
                 ))}
               </div>
             </div>
@@ -389,15 +427,28 @@ export default function TradeCalculator() {
               {/* Trade Summary */}
               <div className="result-card" style={{ borderColor: '#8b5cf6' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Trading</p>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Trading (Total)</p>
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem' }}>
-                    {formatNumber(trade.p1Giving)}
+                    {formatNumber(trade.p1TotalGiving)}
                   </p>
+                  
+                  {trade.p1GivingFromInventory > 0 && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#a78bfa' }}>
+                      <p>From Inventory: +{formatNumber(trade.p1GivingFromInventory)}</p>
+                    </div>
+                  )}
+                  {trade.p1GivingFromBase > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#f87171' }}>
+                      <p>From Base: -{formatNumber(trade.p1GivingFromBase)}</p>
+                    </div>
+                  )}
+                  
                   <p style={{ color: '#d1d5db', marginTop: '1rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Receiving</p>
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p2Giving)}
                   </p>
-                  {trade.lowestCount > 0 && (
+                  
+                  {!useManualInventory && trade.lowestCount > 0 && (
                     <>
                       <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                         <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Lowest Plant Info</p>
