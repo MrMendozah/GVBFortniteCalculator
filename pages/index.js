@@ -488,12 +488,27 @@ export default function TradeCalculator() {
   }
 
   const clearPlayer1 = () => {
+    const hasManualPlants = useManualInventory && inventoryPlants.some(plant => plant !== '')
+    
+    if (hasManualPlants) {
+      const confirmed = window.confirm(
+        '⚠️ WARNING: This will delete ALL 35 plants in your manual inventory!\n\n' +
+        'Are you sure you want to clear everything?'
+      )
+      if (!confirmed) return
+    }
+    
     setPlayer1TradeSlots(['', '', '', '', '', ''])
     setPlayer1FromInventory([false, false, false, false, false, false])
     setPlayer1Total('')
     setLowestPlantDamage('')
     setLowestPlantCount('')
     setInventoryPlants(Array(35).fill(''))
+  }
+
+  const clearPlayer1Trade = () => {
+    setPlayer1TradeSlots(['', '', '', '', '', ''])
+    setPlayer1FromInventory([false, false, false, false, false, false])
   }
 
   const clearPlayer2 = () => {
@@ -518,8 +533,6 @@ export default function TradeCalculator() {
         <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
         <meta name="author" content="GVB Community" />
         <meta name="robots" content="index, follow" />
-        <meta name="language" content="English" />
-        <meta name="revisit-after" content="7 days" />
         
         {/* Google Site Verification */}
         <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
@@ -533,23 +546,18 @@ export default function TradeCalculator() {
         <meta property="og:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
         <meta property="og:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
         <meta property="og:site_name" content="GVB Plant Calculator" />
-        <meta property="og:locale" content="en_US" />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
         <meta name="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
         <meta name="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
-        <meta name="twitter:creator" content="@GVBCommunity" />
         
         {/* Additional Meta Tags */}
         <meta name="theme-color" content="#581c87" />
-        <meta name="msapplication-TileColor" content="#581c87" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="GVB Calculator" />
-        <meta name="application-name" content="GVB Plant Calculator" />
-        <meta name="format-detection" content="telephone=no" />
       </Head>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -724,9 +732,14 @@ export default function TradeCalculator() {
               )}
 
               {/* Trade Slots */}
-              <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                Plants Trading Away (2x3 Grid)
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600' }}>
+                  Plants Trading Away (2x3 Grid)
+                </label>
+                <button onClick={clearPlayer1Trade} className="clear-trade-btn">
+                  Clear Trade
+                </button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
                 {player1TradeSlots.map((plant, index) => (
                   <div key={index} style={{ position: 'relative' }}>
@@ -1145,6 +1158,26 @@ export default function TradeCalculator() {
           border-color: rgba(239, 68, 68, 0.7);
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .clear-trade-btn {
+          background: rgba(251, 146, 60, 0.2);
+          border: 2px solid rgba(251, 146, 60, 0.5);
+          color: #fb923c;
+          padding: 0.4rem 0.75rem;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .clear-trade-btn:hover {
+          background: rgba(251, 146, 60, 0.3);
+          border-color: rgba(251, 146, 60, 0.7);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(251, 146, 60, 0.3);
         }
 
         .result-card {
