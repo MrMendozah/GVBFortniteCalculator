@@ -156,6 +156,12 @@ export default function TradeCalculator() {
     return () => window.removeEventListener('resize', handleResize)
   }, [isMounted])
 
+  // Check if a plant value exists in base
+  const isPlantInBase = (plantValue) => {
+    if (!plantValue || !useManualInventory) return false
+    return inventoryPlants.some(plant => plant === plantValue)
+  }
+
   // Get sorted inventory for display
   const getSortedInventory = () => {
     const indexed = inventoryPlants.map((plant, index) => ({ plant, index }))
@@ -177,7 +183,7 @@ export default function TradeCalculator() {
       setPlayer1TradeSlots(newSlots)
       
       const newFlags = [...player1FromInventory]
-      newFlags[emptyIndex] = false // From base, not inventory
+      newFlags[emptyIndex] = false // From base when clicking + button
       setPlayer1FromInventory(newFlags)
     }
   }
@@ -193,10 +199,10 @@ export default function TradeCalculator() {
     setPlayer1FromInventory(newFlags)
   }
 
-  // Count how many times this value appears in trade slots
+  // Count how many times this value appears in trade slots (not from inventory)
   const countInTrade = (plantValue) => {
     if (!plantValue) return 0
-    return player1TradeSlots.filter(slot => slot === plantValue).length
+    return player1TradeSlots.filter((slot, idx) => slot === plantValue && !player1FromInventory[idx]).length
   }
 
   // Count how many times this value appears in inventory
@@ -359,6 +365,13 @@ export default function TradeCalculator() {
       const newSlots = [...player1TradeSlots]
       newSlots[index] = value
       setPlayer1TradeSlots(newSlots)
+      
+      // Auto-detect if from inventory
+      if (value && useManualInventory) {
+        const newFlags = [...player1FromInventory]
+        newFlags[index] = !isPlantInBase(value)
+        setPlayer1FromInventory(newFlags)
+      }
     } else {
       const newSlots = [...player2TradeSlots]
       newSlots[index] = value
@@ -376,6 +389,15 @@ export default function TradeCalculator() {
     const newPlants = [...inventoryPlants]
     newPlants[index] = value
     setInventoryPlants(newPlants)
+    
+    // Update trade slots that have this value - mark them as from base
+    player1TradeSlots.forEach((slot, slotIndex) => {
+      if (slot === value) {
+        const newFlags = [...player1FromInventory]
+        newFlags[slotIndex] = false // It's now in base, so not from inventory
+        setPlayer1FromInventory(newFlags)
+      }
+    })
   }
 
   const clearPlayer1 = () => {
@@ -407,6 +429,7 @@ export default function TradeCalculator() {
         <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
         <meta name="author" content="GVB Community" />
         <meta name="robots" content="index, follow" />
+        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
         
         {/* Canonical URL */}
         <link rel="canonical" href="https://gvb-fortnite-calculator.vercel.app/" />
@@ -606,6 +629,11 @@ export default function TradeCalculator() {
                         style={{ width: '14px', height: '14px', cursor: 'pointer' }}
                       />
                       From Inventory
+                      {useManualInventory && plant && (
+                        <span style={{ fontSize: '0.65rem', color: player1FromInventory[index] ? '#fbbf24' : '#4ade80' }}>
+                          ({player1FromInventory[index] ? 'not in base' : 'in base'})
+                        </span>
+                      )}
                     </label>
                   </div>
                 ))}
