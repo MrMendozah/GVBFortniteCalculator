@@ -822,23 +822,6 @@ export default function TradeCalculator() {
                     {formatNumber(trade.p1Total)}
                   </p>
                 </div>
-
-                {trade.lowestCount > 0 && (
-                  <div style={{ padding: '1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '12px', marginBottom: '2rem' }}>
-                    <p style={{ color: '#d1d5db', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-                      {useManualInventory ? 'Auto-Detected Lowest Plants' : 'Your Lowest Plants'}
-                    </p>
-                    <p style={{ color: '#a78bfa', fontSize: '1.125rem', fontWeight: '600' }}>
-                      {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
-                    </p>
-                    <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: '600', marginTop: '0.5rem' }}>
-                      Combined Value: {formatNumber(trade.totalLowestPlantDamage)}
-                    </p>
-                    <p style={{ color: '#9ca3af', fontSize: '0.7rem', marginTop: '0.25rem' }}>
-                      (For reference only - not part of your total)
-                    </p>
-                  </div>
-                )}
                 
                 <div style={{ 
                   padding: '1rem 2rem', 
@@ -921,23 +904,6 @@ export default function TradeCalculator() {
                         (Total Received - Total Given)
                       </p>
                     </div>
-                    
-                    {trade.lowestCount > 0 && (
-                      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                          {useManualInventory ? 'Auto-Detected Lowest Plants' : 'Your Lowest Plants'}
-                        </p>
-                        <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
-                          {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
-                        </p>
-                        <p style={{ color: '#8b5cf6', fontSize: '0.95rem', fontWeight: '600', marginTop: '0.25rem' }}>
-                          Combined Value: {formatNumber(trade.totalLowestPlantDamage)}
-                        </p>
-                        <p style={{ color: '#9ca3af', fontSize: '0.65rem', marginTop: '0.15rem' }}>
-                          (Reference - these would be replaced in trades)
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
 
