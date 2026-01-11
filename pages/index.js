@@ -24,13 +24,46 @@ const formatNumber = (num) => {
   return num.toString()
 }
 
+// Custom hook for localStorage with SSR safety
+const useLocalStorage = (key, initialValue) => {
+  const [storedValue, setStoredValue] = useState(initialValue)
+  const [firstLoadDone, setFirstLoadDone] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const item = window.localStorage.getItem(key)
+        if (item) {
+          setStoredValue(JSON.parse(item))
+        }
+      } catch (error) {
+        console.error('Error loading from localStorage:', error)
+      }
+      setFirstLoadDone(true)
+    }
+  }, [key])
+
+  useEffect(() => {
+    if (firstLoadDone && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(storedValue))
+      } catch (error) {
+        console.error('Error saving to localStorage:', error)
+      }
+    }
+  }, [storedValue, firstLoadDone, key])
+
+  return [storedValue, setStoredValue]
+}
+
 export default function TradeCalculator() {
   const canvasRef = useRef(null)
-  const [player1Total, setPlayer1Total] = useState('')
-  const [player1Plants, setPlayer1Plants] = useState(['', '', '', '', '', ''])
-  const [player2Plants, setPlayer2Plants] = useState(['', '', '', '', '', ''])
-  const [lowestPlantDamage, setLowestPlantDamage] = useState('')
-  const [lowestPlantCount, setLowestPlantCount] = useState('')
+  const [player1Total, setPlayer1Total] = useLocalStorage('player1Total', '')
+  const [player1Plants, setPlayer1Plants] = useLocalStorage('player1Plants', Array(35).fill(''))
+  const [player2Plants, setPlayer2Plants] = useLocalStorage('player2Plants', Array(35).fill(''))
+  const [lowestPlantDamage, setLowestPlantDamage] = useLocalStorage('lowestPlantDamage', '')
+  const [lowestPlantCount, setLowestPlantCount] = useLocalStorage('lowestPlantCount', '')
+  const [useCalculatedTotal, setUseCalculatedTotal] = useLocalStorage('useCalculatedTotal', false)
 
   // Particle animation
   useEffect(() => {
@@ -118,7 +151,10 @@ export default function TradeCalculator() {
 
   // Calculate trade outcome
   const calculateTrade = () => {
-    const p1Total = parseNumber(player1Total)
+    // Calculate total from all plants if checkbox is enabled
+    const calculatedP1Total = player1Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
+    const p1Total = useCalculatedTotal ? calculatedP1Total : parseNumber(player1Total)
+    
     const lowestDamage = parseNumber(lowestPlantDamage)
     const lowestCount = parseNumber(lowestPlantCount)
     
@@ -142,7 +178,8 @@ export default function TradeCalculator() {
       p2Giving,
       totalLowestPlantDamage,
       lowestDamage,
-      lowestCount
+      lowestCount,
+      p1Total
     }
   }
 
@@ -160,6 +197,17 @@ export default function TradeCalculator() {
     }
   }
 
+  const clearPlayer1 = () => {
+    setPlayer1Plants(Array(35).fill(''))
+    setPlayer1Total('')
+    setLowestPlantDamage('')
+    setLowestPlantCount('')
+  }
+
+  const clearPlayer2 = () => {
+    setPlayer2Plants(Array(35).fill(''))
+  }
+
   return (
     <>
       <Head>
@@ -170,38 +218,57 @@ export default function TradeCalculator() {
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
 
       <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem', position: 'relative' }}>
-        <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
+        <div style={{ maxWidth: '90rem', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '3rem' }} className="animate-fade-in">
             <h1 style={{ fontSize: '3rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem' }}>
               GVB Fortnite Trade Calculator
             </h1>
             <p style={{ color: '#d1d5db', fontSize: '1.125rem' }}>
-              Calculate 2x3 plant trades • Use 100k, 1mil shorthand
+              Calculate trades with up to 35 plants • Auto-saves your data
             </p>
           </div>
 
           {/* Trade Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
             {/* Player 1 */}
             <div className="glass-card animate-slide-up">
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
-                <span style={{ background: '#3b82f6', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>1</span>
-                Player 1
-              </h2>
-              
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
-                  Total Base Damage
-                </label>
-                <input
-                  type="text"
-                  value={player1Total}
-                  onChange={(e) => setPlayer1Total(e.target.value)}
-                  placeholder="e.g., 21.3mil or 100k"
-                  className="input-field"
-                />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', margin: 0 }}>
+                  <span style={{ background: '#3b82f6', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>1</span>
+                  Player 1 (You)
+                </h2>
+                <button onClick={clearPlayer1} className="clear-btn">
+                  Clear All
+                </button>
               </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={useCalculatedTotal}
+                    onChange={(e) => setUseCalculatedTotal(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Calculate total from all 35 plants below
+                </label>
+              </div>
+
+              {!useCalculatedTotal && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                    Total Base Damage
+                  </label>
+                  <input
+                    type="text"
+                    value={player1Total}
+                    onChange={(e) => setPlayer1Total(e.target.value)}
+                    placeholder="e.g., 21.3mil or 100k"
+                    className="input-field"
+                  />
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
@@ -231,43 +298,52 @@ export default function TradeCalculator() {
               </div>
 
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                Plants Trading Away (2x3 Grid)
+                All 35 Plants Trading Away
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
-                {player1Plants.map((plant, index) => (
-                  <input
-                    key={index}
-                    type="text"
-                    value={plant}
-                    onChange={(e) => updatePlant(1, index, e.target.value)}
-                    placeholder={`Plant ${index + 1}`}
-                    className="input-field-small"
-                  />
-                ))}
+              <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                  {player1Plants.map((plant, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      value={plant}
+                      onChange={(e) => updatePlant(1, index, e.target.value)}
+                      placeholder={`Plant ${index + 1}`}
+                      className="input-field-small"
+                    />
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Player 2 */}
             <div className="glass-card animate-slide-up-delay">
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
-                <span style={{ background: '#22c55e', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>2</span>
-                Player 2
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', margin: 0 }}>
+                  <span style={{ background: '#22c55e', width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>2</span>
+                  Player 2
+                </h2>
+                <button onClick={clearPlayer2} className="clear-btn">
+                  Clear All
+                </button>
+              </div>
 
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                Plants Trading to You (2x3 Grid)
+                All 35 Plants Trading to You
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
-                {player2Plants.map((plant, index) => (
-                  <input
-                    key={index}
-                    type="text"
-                    value={plant}
-                    onChange={(e) => updatePlant(2, index, e.target.value)}
-                    placeholder={`Plant ${index + 1}`}
-                    className="input-field-small"
-                  />
-                ))}
+              <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                  {player2Plants.map((plant, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      value={plant}
+                      onChange={(e) => updatePlant(2, index, e.target.value)}
+                      placeholder={`Plant ${index + 1}`}
+                      className="input-field-small"
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -309,7 +385,13 @@ export default function TradeCalculator() {
               {/* Final Result */}
               <div className="result-card" style={{ borderColor: trade.p1IsGood ? '#4ade80' : '#f87171' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>New Total</p>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                    {useCalculatedTotal ? 'Current Total (Calculated)' : 'Current Total'}
+                  </p>
+                  <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
+                    {formatNumber(trade.p1Total)}
+                  </p>
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem', marginTop: '1rem' }}>New Total After Trade</p>
                   <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'white', marginBottom: '0.75rem' }}>
                     {formatNumber(trade.p1NewTotal)}
                   </p>
@@ -335,9 +417,17 @@ export default function TradeCalculator() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         * {
+          margin: 0;
+          padding: 0;
           box-sizing: border-box;
+        }
+
+        html, body {
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
         }
 
         .glass-card {
@@ -374,7 +464,7 @@ export default function TradeCalculator() {
 
         .input-field-small {
           width: 100%;
-          padding: 12px 14px;
+          padding: 10px 12px;
           background: rgba(255, 255, 255, 0.08);
           border-radius: 10px;
           color: white;
@@ -395,6 +485,25 @@ export default function TradeCalculator() {
           color: rgba(255, 255, 255, 0.4);
         }
 
+        .clear-btn {
+          background: rgba(239, 68, 68, 0.2);
+          border: 2px solid rgba(239, 68, 68, 0.5);
+          color: #f87171;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .clear-btn:hover {
+          background: rgba(239, 68, 68, 0.3);
+          border-color: rgba(239, 68, 68, 0.7);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
         .result-card {
           background: rgba(0, 0, 0, 0.3);
           border-radius: 16px;
@@ -406,6 +515,24 @@ export default function TradeCalculator() {
         .result-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.5);
+          border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(139, 92, 246, 0.7);
         }
 
         @keyframes fadeIn {
