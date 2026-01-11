@@ -1,0 +1,54 @@
+import { Html, Head, Main, NextScript } from 'next/document'
+
+export default function Document() {
+  return (
+    <Html lang="en">
+      <Head>
+        <meta charSet="utf-8" />
+        <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        
+        {/* Primary Meta Tags */}
+        <meta name="title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot Trade Calculator" />
+        <meta name="description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot (GVB). Independent project made for fun, non-profit with no ads. Optimize your trades and maximize your damage!" />
+        <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
+        <meta name="author" content="GVB Community" />
+        <meta name="robots" content="index, follow" />
+        
+        {/* Google Site Verification */}
+        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
+        
+        {/* Canonical URL */}
+        <link rel="canonical" href="https://gvb-fortnite-calculator.vercel.app/" />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://gvb-fortnite-calculator.vercel.app/" />
+        <meta property="og:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
+        <meta property="og:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        <meta property="og:site_name" content="GVB Plant Calculator" />
+        <meta property="og:locale" content="en_US" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
+        <meta name="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
+        <meta name="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        
+        {/* Additional Meta Tags */}
+        <meta name="theme-color" content="#581c87" />
+        <meta name="msapplication-TileColor" content="#581c87" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="GVB Calculator" />
+        
+        {/* Fonts (if needed) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </Head>
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  )
+}
