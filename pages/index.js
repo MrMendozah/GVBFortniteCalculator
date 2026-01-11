@@ -165,8 +165,27 @@ export default function TradeCalculator() {
     const calculatedTotal = inventoryPlants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     const p1Total = useManualInventory ? calculatedTotal : parseNumber(player1Total)
     
-    const lowestDamage = parseNumber(lowestPlantDamage)
-    const lowestCount = parseNumber(lowestPlantCount)
+    // Determine lowest plant damage
+    let lowestDamage = 0
+    let lowestCount = 0
+    
+    if (useManualInventory) {
+      // Auto-detect from inventory
+      const plantValues = inventoryPlants
+        .map(plant => parseNumber(plant))
+        .filter(val => val > 0)
+        .sort((a, b) => a - b) // Sort ascending
+      
+      if (plantValues.length > 0) {
+        lowestDamage = plantValues[0]
+        // Count how many plants have this lowest value
+        lowestCount = plantValues.filter(val => val === lowestDamage).length
+      }
+    } else {
+      // Use manual input
+      lowestDamage = parseNumber(lowestPlantDamage)
+      lowestCount = parseNumber(lowestPlantCount)
+    }
     
     // Separate what you're trading from base vs inventory
     let basePlants = []
@@ -358,7 +377,7 @@ export default function TradeCalculator() {
                     onChange={(e) => setUseManualInventory(e.target.checked)}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  Track all 35 plants manually for accurate total
+                  Track all 35 plants manually (auto-detects lowest)
                 </label>
               </div>
 
@@ -414,6 +433,13 @@ export default function TradeCalculator() {
                       (Total: {formatNumber(trade.p1Total)})
                     </span>
                   </label>
+                  {trade.lowestDamage > 0 && (
+                    <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(139, 92, 246, 0.15)', borderRadius: '8px' }}>
+                      <p style={{ color: '#a78bfa', fontSize: '0.75rem' }}>
+                        Auto-detected: {formatNumber(trade.lowestDamage)} × {trade.lowestCount} lowest plant{trade.lowestCount > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
                   <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                       {inventoryPlants.map((plant, index) => (
@@ -576,10 +602,12 @@ export default function TradeCalculator() {
                     </p>
                   </div>
                   
-                  {!useManualInventory && trade.lowestCount > 0 && (
+                  {trade.lowestCount > 0 && (
                     <>
                       <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Your Lowest Plants</p>
+                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                          {useManualInventory ? 'Auto-Detected Lowest Plants' : 'Your Lowest Plants'}
+                        </p>
                         <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
                           {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
                         </p>
