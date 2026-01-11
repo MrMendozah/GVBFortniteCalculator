@@ -509,6 +509,7 @@ export default function TradeCalculator() {
       <Head>
         <title>GVB Plant Calculator</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta charSet="utf-8" />
         
         {/* Google Site Verification */}
         <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
@@ -529,17 +530,26 @@ export default function TradeCalculator() {
         <meta property="og:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
         <meta property="og:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
         <meta property="og:site_name" content="GVB Plant Calculator" />
+        <meta property="og:image" content="https://gvb-fortnite-calculator.vercel.app/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         
         {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
-        <meta property="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
-        <meta property="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
+        <meta name="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
+        <meta name="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
+        <meta name="twitter:image" content="https://gvb-fortnite-calculator.vercel.app/og-image.png" />
         
         {/* Additional Meta Tags */}
         <meta name="theme-color" content="#581c87" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="GVB Calculator" />
+        
+        {/* Favicon */}
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </Head>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
