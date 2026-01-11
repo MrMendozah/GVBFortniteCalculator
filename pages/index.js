@@ -179,10 +179,13 @@ export default function TradeCalculator() {
     // Calculate total plant damage for lowest plants
     const totalLowestPlantDamage = lowestDamage * lowestCount
     
+    // Calculate raw difference (what you receive vs what you give)
+    const rawDifference = p2Giving - p1TotalGiving
+    
     // Net change calculation
-    // From inventory: ADD (you're removing from inventory, so it adds to base)
-    // From base: SUBTRACT (you're trading away from base)
-    // Receiving: ADD (you're getting plants)
+    // From inventory: ADD (removing from storage adds to base)
+    // From base: SUBTRACT (trading away reduces base)
+    // Receiving: ADD (getting plants)
     const netChange = p1GivingFromInventory - p1GivingFromBase + p2Giving
     
     // New total after trade
@@ -191,6 +194,7 @@ export default function TradeCalculator() {
     return {
       p1NewTotal,
       netChange,
+      rawDifference,
       p1IsGood: netChange > 0,
       p1TotalGiving,
       p1GivingFromBase,
@@ -432,26 +436,45 @@ export default function TradeCalculator() {
                     {formatNumber(trade.p1TotalGiving)}
                   </p>
                   
-                  {trade.p1GivingFromInventory > 0 && (
-                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#a78bfa' }}>
-                      <p>From Inventory: +{formatNumber(trade.p1GivingFromInventory)}</p>
-                    </div>
-                  )}
-                  {trade.p1GivingFromBase > 0 && (
-                    <div style={{ fontSize: '0.75rem', color: '#f87171' }}>
-                      <p>From Base: -{formatNumber(trade.p1GivingFromBase)}</p>
-                    </div>
-                  )}
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    {trade.p1GivingFromInventory > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#a78bfa', marginBottom: '0.5rem' }}>
+                        <p>✓ From Inventory: {formatNumber(trade.p1GivingFromInventory)}</p>
+                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>(Adds to base)</p>
+                      </div>
+                    )}
+                    {trade.p1GivingFromBase > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#f87171' }}>
+                        <p>✗ From Base: {formatNumber(trade.p1GivingFromBase)}</p>
+                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>(Reduces base)</p>
+                      </div>
+                    )}
+                  </div>
                   
                   <p style={{ color: '#d1d5db', marginTop: '1rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>You're Receiving</p>
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p2Giving)}
                   </p>
+
+                  {/* Raw Difference */}
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Raw Trade Difference</p>
+                    <p style={{ 
+                      fontSize: '1.25rem', 
+                      fontWeight: 'bold', 
+                      color: trade.rawDifference >= 0 ? '#4ade80' : '#f87171'
+                    }}>
+                      {trade.rawDifference >= 0 ? '+' : ''}{formatNumber(trade.rawDifference)}
+                    </p>
+                    <p style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                      (Receiving - Giving)
+                    </p>
+                  </div>
                   
                   {!useManualInventory && trade.lowestCount > 0 && (
                     <>
-                      <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Lowest Plant Info</p>
+                      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Lowest Plant Context</p>
                         <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
                           {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
                         </p>
@@ -473,13 +496,29 @@ export default function TradeCalculator() {
                   <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p1Total)}
                   </p>
-                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem', marginTop: '1rem' }}>New Total After Trade</p>
+                  
+                  <div style={{ margin: '1.5rem 0', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                    <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Net Base Change</p>
+                    <p style={{ 
+                      fontSize: '1.5rem', 
+                      fontWeight: 'bold', 
+                      color: trade.netChange >= 0 ? '#4ade80' : '#f87171',
+                      marginBottom: '0.5rem'
+                    }}>
+                      {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
+                    </p>
+                    <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.4' }}>
+                      {trade.p1GivingFromInventory > 0 && <p>+{formatNumber(trade.p1GivingFromInventory)} (from inventory)</p>}
+                      {trade.p1GivingFromBase > 0 && <p>-{formatNumber(trade.p1GivingFromBase)} (from base)</p>}
+                      {trade.p2Giving > 0 && <p>+{formatNumber(trade.p2Giving)} (receiving)</p>}
+                    </div>
+                  </div>
+                  
+                  <p style={{ color: '#d1d5db', marginBottom: '0.75rem', fontSize: '0.875rem' }}>New Total After Trade</p>
                   <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'white', marginBottom: '0.75rem' }}>
                     {formatNumber(trade.p1NewTotal)}
                   </p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: '600', color: trade.p1IsGood ? '#4ade80' : '#f87171', marginBottom: '1rem' }}>
-                    {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
-                  </p>
+                  
                   <p style={{ 
                     marginTop: '0.5rem', 
                     padding: '0.5rem 1.5rem', 
