@@ -29,6 +29,8 @@ export default function TradeCalculator() {
   const [player1Total, setPlayer1Total] = useState('')
   const [player1Plants, setPlayer1Plants] = useState(['', '', '', '', '', ''])
   const [player2Plants, setPlayer2Plants] = useState(['', '', '', '', '', ''])
+  const [lowestPlantDamage, setLowestPlantDamage] = useState('')
+  const [lowestPlantCount, setLowestPlantCount] = useState('')
 
   // Particle animation
   useEffect(() => {
@@ -117,19 +119,30 @@ export default function TradeCalculator() {
   // Calculate trade outcome
   const calculateTrade = () => {
     const p1Total = parseNumber(player1Total)
+    const lowestDamage = parseNumber(lowestPlantDamage)
+    const lowestCount = parseNumber(lowestPlantCount)
     
     const p1Giving = player1Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     const p2Giving = player2Plants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     
-    const p1NewTotal = p1Total - p1Giving + p2Giving
-    const p1Difference = p1NewTotal - p1Total
+    // Calculate total plant damage for lowest plants
+    const totalLowestPlantDamage = lowestDamage * lowestCount
+    
+    // Net change calculation
+    const netChange = p2Giving - p1Giving
+    
+    // New total after trade
+    const p1NewTotal = p1Total + netChange
     
     return {
       p1NewTotal,
-      p1Difference,
-      p1IsGood: p1Difference > 0,
+      netChange,
+      p1IsGood: netChange > 0,
       p1Giving,
-      p2Giving
+      p2Giving,
+      totalLowestPlantDamage,
+      lowestDamage,
+      lowestCount
     }
   }
 
@@ -154,9 +167,9 @@ export default function TradeCalculator() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: 0, pointerEvents: 'none' }} />
+      <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
 
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #581c87, #1e3a8a, #312e81)', padding: '3rem 1rem', position: 'relative' }}>
         <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '3rem' }} className="animate-fade-in">
@@ -188,6 +201,33 @@ export default function TradeCalculator() {
                   placeholder="e.g., 21.3mil or 100k"
                   className="input-field"
                 />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                    Lowest Plant Damage
+                  </label>
+                  <input
+                    type="text"
+                    value={lowestPlantDamage}
+                    onChange={(e) => setLowestPlantDamage(e.target.value)}
+                    placeholder="e.g., 700k"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+                    # of Lowest Plants
+                  </label>
+                  <input
+                    type="text"
+                    value={lowestPlantCount}
+                    onChange={(e) => setLowestPlantCount(e.target.value)}
+                    placeholder="e.g., 35"
+                    className="input-field"
+                  />
+                </div>
               </div>
 
               <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
@@ -250,6 +290,19 @@ export default function TradeCalculator() {
                   <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e', marginBottom: '0.5rem' }}>
                     {formatNumber(trade.p2Giving)}
                   </p>
+                  {trade.lowestCount > 0 && (
+                    <>
+                      <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Lowest Plant Info</p>
+                        <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
+                          {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
+                        </p>
+                        <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                          Total: {formatNumber(trade.totalLowestPlantDamage)}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -261,7 +314,7 @@ export default function TradeCalculator() {
                     {formatNumber(trade.p1NewTotal)}
                   </p>
                   <p style={{ fontSize: '1.25rem', fontWeight: '600', color: trade.p1IsGood ? '#4ade80' : '#f87171', marginBottom: '1rem' }}>
-                    {trade.p1Difference >= 0 ? '+' : ''}{formatNumber(trade.p1Difference)}
+                    {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
                   </p>
                   <p style={{ 
                     marginTop: '0.5rem', 
@@ -285,7 +338,6 @@ export default function TradeCalculator() {
       <style jsx>{`
         * {
           box-sizing: border-box;
-          outline: none;
         }
 
         .glass-card {
@@ -297,11 +349,15 @@ export default function TradeCalculator() {
           box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
+        .input-field, .input-field-small {
+          outline: none !important;
+          border: 2px solid rgba(139, 92, 246, 0.3);
+        }
+
         .input-field {
           width: 100%;
           padding: 14px 18px;
           background: rgba(255, 255, 255, 0.1);
-          border: 2px solid rgba(255, 255, 255, 0.2);
           border-radius: 12px;
           color: white;
           font-size: 16px;
@@ -310,18 +366,16 @@ export default function TradeCalculator() {
         }
 
         .input-field:focus {
-          outline: none;
-          border-color: rgba(139, 92, 246, 0.6);
+          border-color: rgba(139, 92, 246, 0.7);
           background: rgba(255, 255, 255, 0.15);
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
         }
 
         .input-field-small {
           width: 100%;
           padding: 12px 14px;
           background: rgba(255, 255, 255, 0.08);
-          border: 2px solid rgba(255, 255, 255, 0.15);
           border-radius: 10px;
           color: white;
           font-size: 14px;
@@ -330,10 +384,10 @@ export default function TradeCalculator() {
         }
 
         .input-field-small:focus {
-          outline: none;
-          border-color: rgba(139, 92, 246, 0.5);
+          border-color: rgba(139, 92, 246, 0.7);
           background: rgba(255, 255, 255, 0.12);
           transform: scale(1.02);
+          box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
         }
 
         .input-field::placeholder,
