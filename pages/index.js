@@ -210,7 +210,7 @@ export default function TradeCalculator() {
     return totalInBase > usedInTrade
   }
 
-  // Get sorted inventory for display
+  // Get sorted inventory for display (but don't modify the original order)
   const getSortedInventory = () => {
     const indexed = inventoryPlants.map((plant, index) => ({ plant, index }))
     
@@ -222,7 +222,7 @@ export default function TradeCalculator() {
     return indexed
   }
 
-  // Add plant to trade slot (only add one instance)
+  // Add plant to trade slot (only add one instance) - keep original index
   const addToTrade = (plantValue) => {
     const emptyIndex = player1TradeSlots.findIndex(slot => !slot || slot === '')
     if (emptyIndex !== -1) {
@@ -328,64 +328,54 @@ export default function TradeCalculator() {
     
     const p2Giving = receivedPlants.reduce((sum, val) => sum + val, 0)
     
-    // Calculate the actual gain
-    let netChange = 0
+    // CORRECTED LOGIC:
+    // Net change = Total Received - Total Given (from base only)
+    // Because: You remove plants from base (-p1GivingFromBase) and add received plants (+p2Giving)
+    const netChange = p2Giving - p1GivingFromBase
+    
+    const rawDifference = p2Giving - p1TotalGiving
+    const p1NewTotal = p1Total + netChange
+    
+    // Build detailed breakdown
     let replacementDetails = []
+    const numSlotsCreated = basePlants.length
+    const numSlotsFilledByReceived = Math.min(receivedPlants.length, numSlotsCreated)
+    const extraReceivedPlants = receivedPlants.length > numSlotsCreated ? receivedPlants.length - numSlotsCreated : 0
     
-    // Step 1: Match received plants with traded base plants
-    let receivedIndex = 0
-    basePlants.sort((a, b) => b - a)
-    
-    for (let i = 0; i < basePlants.length && receivedIndex < receivedPlants.length; i++) {
-      const tradedValue = basePlants[i]
-      const receivedValue = receivedPlants[receivedIndex]
-      
-      // Check if the traded plant is one of the lowest
-      const isLowestPlant = useManualInventory 
-        ? (lowestDamage > 0 && tradedValue === lowestDamage)
-        : (lowestDamage > 0 && tradedValue >= parseNumber(lowestPlantDamage) && tradedValue < parseNumber(lowestPlantDamage) * 1.2)
-      
-      const gain = receivedValue - tradedValue
-      
-      netChange += gain
+    // Show which slots are being filled
+    for (let i = 0; i < numSlotsFilledByReceived; i++) {
       replacementDetails.push({
-        type: isLowestPlant ? 'lowest-slot' : 'slot',
-        received: receivedValue,
-        replaced: tradedValue,
-        gain: gain,
-        wasLowest: isLowestPlant
+        type: 'slot-fill',
+        received: receivedPlants[i],
+        action: `Adding ${formatNumber(receivedPlants[i])} to empty slot`,
+        gain: receivedPlants[i]
       })
-      receivedIndex++
     }
     
-    // Step 2: Remaining received plants replace lowest plants (if better)
-    for (let i = receivedIndex; i < receivedPlants.length; i++) {
+    // If there are extra received plants beyond slots created, they replace lowest
+    for (let i = numSlotsFilledByReceived; i < receivedPlants.length; i++) {
       const receivedValue = receivedPlants[i]
-      
       if (lowestDamage > 0 && receivedValue > lowestDamage) {
         const gain = receivedValue - lowestDamage
-        netChange += gain
         replacementDetails.push({
-          type: 'lowest',
+          type: 'lowest-replace',
           received: receivedValue,
           replaced: lowestDamage,
-          gain: gain,
-          wasLowest: false
+          action: `${formatNumber(receivedValue)} replaces lowest ${formatNumber(lowestDamage)}`,
+          gain: gain
         })
       } else {
         replacementDetails.push({
-          type: 'none',
+          type: 'no-replace',
           received: receivedValue,
           replaced: lowestDamage || 0,
-          gain: 0,
-          wasLowest: false
+          action: `${formatNumber(receivedValue)} ≤ lowest, not replacing`,
+          gain: 0
         })
       }
     }
     
     const totalLowestPlantDamage = lowestDamage * lowestCount
-    const rawDifference = p2Giving - p1TotalGiving
-    const p1NewTotal = p1Total + netChange
     
     return {
       p1NewTotal,
@@ -402,7 +392,9 @@ export default function TradeCalculator() {
       totalLowestPlantDamage,
       lowestDamage,
       lowestCount,
-      p1Total
+      p1Total,
+      numSlotsCreated,
+      numEmptySlots: Math.max(0, numSlotsCreated - receivedPlants.length)
     }
   }
 
@@ -794,7 +786,7 @@ export default function TradeCalculator() {
             </div>
           </div>
 
-          {/* Results - Same as before, keeping it unchanged */}
+          {/* Results */}
           <div className="glass-card animate-fade-in-delay">
             <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1.5rem', textAlign: 'center' }}>
               Trade Analysis
@@ -819,7 +811,9 @@ export default function TradeCalculator() {
                     {trade.p1GivingFromBase > 0 && (
                       <div style={{ fontSize: '0.75rem', color: '#f87171' }}>
                         <p>✗ From Base: {formatNumber(trade.p1GivingFromBase)}</p>
-                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({trade.basePlantCount} plant{trade.basePlantCount > 1 ? 's' : ''} creating {trade.basePlantCount} slot{trade.basePlantCount > 1 ? 's' : ''})</p>
+                        <p style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                          ({trade.basePlantCount} plant{trade.basePlantCount > 1 ? 's' : ''} removed, creating {trade.numSlotsCreated} slot{trade.numSlotsCreated > 1 ? 's' : ''})
+                        </p>
                       </div>
                     )}
                   </div>
@@ -832,37 +826,20 @@ export default function TradeCalculator() {
                   {trade.replacementDetails.length > 0 && (
                     <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                       <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.75rem' }}>
-                        Plant Replacement Breakdown
+                        What You're Adding to Base
                       </p>
                       {trade.replacementDetails.map((detail, idx) => (
                         <div key={idx} style={{ fontSize: '0.7rem', color: '#9ca3af', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                          {(detail.type === 'slot' || detail.type === 'lowest-slot') && (
-                            <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
-                              {formatNumber(detail.received)} fills {formatNumber(detail.replaced)} slot
-                              {detail.wasLowest && <span style={{ color: '#fbbf24' }}> (was lowest!)</span>} = 
-                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
-                                {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
-                              </span>
-                            </p>
-                          )}
-                          {detail.type === 'lowest' && (
-                            <p style={{ color: detail.gain >= 0 ? '#4ade80' : '#f87171' }}>
-                              {formatNumber(detail.received)} replaces lowest ({formatNumber(detail.replaced)}) = 
-                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem' }}>
-                                {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)}
-                              </span>
-                            </p>
-                          )}
-                          {detail.type === 'none' && (
-                            <p style={{ color: '#9ca3af' }}>
-                              {formatNumber(detail.received)} ≤ lowest ({formatNumber(detail.replaced)}) = 
-                              <span style={{ fontWeight: 'bold', marginLeft: '0.25rem', color: '#9ca3af' }}>
-                                +0 (not added)
-                              </span>
-                            </p>
-                          )}
+                          <p style={{ color: '#4ade80' }}>
+                            {detail.action}
+                          </p>
                         </div>
                       ))}
+                      {trade.numEmptySlots > 0 && (
+                        <p style={{ fontSize: '0.7rem', color: '#f87171', marginTop: '0.5rem' }}>
+                          {trade.numEmptySlots} empty slot{trade.numEmptySlots > 1 ? 's' : ''} remain (no plant to fill)
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -917,15 +894,8 @@ export default function TradeCalculator() {
                       {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
                     </p>
                     <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.4' }}>
-                      {trade.replacementDetails.map((detail, idx) => (
-                        <p key={idx}>
-                          {detail.gain >= 0 ? '+' : ''}{formatNumber(detail.gain)} 
-                          {detail.type === 'slot' && ' (slot fill)'}
-                          {detail.type === 'lowest-slot' && ' (lowest slot fill)'}
-                          {detail.type === 'lowest' && ' (lowest replace)'}
-                          {detail.type === 'none' && ' (below lowest)'}
-                        </p>
-                      ))}
+                      <p>Removed from base: -{formatNumber(trade.p1GivingFromBase)}</p>
+                      <p>Added to base: +{formatNumber(trade.p2Giving)}</p>
                     </div>
                   </div>
                   
