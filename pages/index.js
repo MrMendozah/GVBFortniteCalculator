@@ -328,54 +328,54 @@ export default function TradeCalculator() {
     
     const p2Giving = receivedPlants.reduce((sum, val) => sum + val, 0)
     
-    // CORRECTED LOGIC:
-    // Net change = Total Received - Total Given (from base only)
-    // Because: You remove plants from base (-p1GivingFromBase) and add received plants (+p2Giving)
-    const netChange = p2Giving - p1GivingFromBase
+    // Calculate net change
+    let netChange = 0
+    let replacementDetails = []
+    const numSlotsCreated = basePlants.length
+    
+    // Process all received plants
+    receivedPlants.forEach((receivedValue, idx) => {
+      if (idx < numSlotsCreated) {
+        // This plant fills a slot created by trading away a base plant
+        netChange += receivedValue
+        replacementDetails.push({
+          type: 'slot-fill',
+          received: receivedValue,
+          action: `Adding ${formatNumber(receivedValue)} to empty slot`,
+          gain: receivedValue
+        })
+      } else {
+        // Extra plants OR receiving without trading - try to replace lowest
+        if (lowestDamage > 0 && receivedValue > lowestDamage) {
+          const gain = receivedValue - lowestDamage
+          netChange += gain
+          replacementDetails.push({
+            type: 'lowest-replace',
+            received: receivedValue,
+            replaced: lowestDamage,
+            action: `${formatNumber(receivedValue)} replaces lowest ${formatNumber(lowestDamage)}`,
+            gain: gain
+          })
+        } else {
+          // Plant is not better than lowest, no benefit
+          replacementDetails.push({
+            type: 'no-replace',
+            received: receivedValue,
+            replaced: lowestDamage || 0,
+            action: `${formatNumber(receivedValue)} ≤ lowest ${formatNumber(lowestDamage)}, not replacing`,
+            gain: 0
+          })
+        }
+      }
+    })
+    
+    // Subtract what we gave from base
+    netChange -= p1GivingFromBase
     
     const rawDifference = p2Giving - p1TotalGiving
     const p1NewTotal = p1Total + netChange
-    
-    // Build detailed breakdown
-    let replacementDetails = []
-    const numSlotsCreated = basePlants.length
-    const numSlotsFilledByReceived = Math.min(receivedPlants.length, numSlotsCreated)
-    const extraReceivedPlants = receivedPlants.length > numSlotsCreated ? receivedPlants.length - numSlotsCreated : 0
-    
-    // Show which slots are being filled
-    for (let i = 0; i < numSlotsFilledByReceived; i++) {
-      replacementDetails.push({
-        type: 'slot-fill',
-        received: receivedPlants[i],
-        action: `Adding ${formatNumber(receivedPlants[i])} to empty slot`,
-        gain: receivedPlants[i]
-      })
-    }
-    
-    // If there are extra received plants beyond slots created, they replace lowest
-    for (let i = numSlotsFilledByReceived; i < receivedPlants.length; i++) {
-      const receivedValue = receivedPlants[i]
-      if (lowestDamage > 0 && receivedValue > lowestDamage) {
-        const gain = receivedValue - lowestDamage
-        replacementDetails.push({
-          type: 'lowest-replace',
-          received: receivedValue,
-          replaced: lowestDamage,
-          action: `${formatNumber(receivedValue)} replaces lowest ${formatNumber(lowestDamage)}`,
-          gain: gain
-        })
-      } else {
-        replacementDetails.push({
-          type: 'no-replace',
-          received: receivedValue,
-          replaced: lowestDamage || 0,
-          action: `${formatNumber(receivedValue)} ≤ lowest, not replacing`,
-          gain: 0
-        })
-      }
-    }
-    
     const totalLowestPlantDamage = lowestDamage * lowestCount
+    const numEmptySlots = Math.max(0, numSlotsCreated - receivedPlants.length)
     
     return {
       p1NewTotal,
@@ -394,7 +394,7 @@ export default function TradeCalculator() {
       lowestCount,
       p1Total,
       numSlotsCreated,
-      numEmptySlots: Math.max(0, numSlotsCreated - receivedPlants.length)
+      numEmptySlots
     }
   }
 
@@ -507,12 +507,10 @@ export default function TradeCalculator() {
   return (
     <>
       <Head>
-        <title>GVB Plant Calculator</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>GVB Plant Calculator - Fortnite Garden Vs Brainrot Trade Calculator</title>
         <meta charSet="utf-8" />
-        
-        {/* Google Site Verification */}
-        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         
         {/* Primary Meta Tags */}
         <meta name="title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot Trade Calculator" />
@@ -520,6 +518,11 @@ export default function TradeCalculator() {
         <meta name="keywords" content="Fortnite, Fortnite GVB, Fortnite Garden Vs Brainrot, Plants vs brainrot, PVB, GVB Calculator, Fortnite Plant Calculator, Garden Vs Brainrot Calculator, 0497-4522-9912" />
         <meta name="author" content="GVB Community" />
         <meta name="robots" content="index, follow" />
+        <meta name="language" content="English" />
+        <meta name="revisit-after" content="7 days" />
+        
+        {/* Google Site Verification */}
+        <meta name="google-site-verification" content="CYg00kX0vlgS8O26vKScA2FiqTGG6QylMkkMTpev8nc" />
         
         {/* Canonical URL */}
         <link rel="canonical" href="https://gvb-fortnite-calculator.vercel.app/" />
@@ -530,26 +533,23 @@ export default function TradeCalculator() {
         <meta property="og:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
         <meta property="og:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
         <meta property="og:site_name" content="GVB Plant Calculator" />
-        <meta property="og:image" content="https://gvb-fortnite-calculator.vercel.app/og-image.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        <meta property="og:locale" content="en_US" />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:url" content="https://gvb-fortnite-calculator.vercel.app/" />
         <meta name="twitter:title" content="GVB Plant Calculator - Fortnite Garden Vs Brainrot" />
         <meta name="twitter:description" content="Fortnite map code 0497-4522-9912. Calculate the best plant trades for Garden Vs Brainrot. Free tool with no ads!" />
-        <meta name="twitter:image" content="https://gvb-fortnite-calculator.vercel.app/og-image.png" />
+        <meta name="twitter:creator" content="@GVBCommunity" />
         
         {/* Additional Meta Tags */}
         <meta name="theme-color" content="#581c87" />
+        <meta name="msapplication-TileColor" content="#581c87" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="GVB Calculator" />
-        
-        {/* Favicon */}
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="application-name" content="GVB Plant Calculator" />
+        <meta name="format-detection" content="telephone=no" />
       </Head>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -840,7 +840,7 @@ export default function TradeCalculator() {
                       </p>
                       {trade.replacementDetails.map((detail, idx) => (
                         <div key={idx} style={{ fontSize: '0.7rem', color: '#9ca3af', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                          <p style={{ color: '#4ade80' }}>
+                          <p style={{ color: detail.type === 'no-replace' ? '#9ca3af' : '#4ade80' }}>
                             {detail.action}
                           </p>
                         </div>
@@ -904,8 +904,8 @@ export default function TradeCalculator() {
                       {trade.netChange >= 0 ? '+' : ''}{formatNumber(trade.netChange)}
                     </p>
                     <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.4' }}>
-                      <p>Removed from base: -{formatNumber(trade.p1GivingFromBase)}</p>
-                      <p>Added to base: +{formatNumber(trade.p2Giving)}</p>
+                      {trade.p1GivingFromBase > 0 && <p>Removed from base: -{formatNumber(trade.p1GivingFromBase)}</p>}
+                      {trade.p2Giving > 0 && <p>Value from replacements: +{formatNumber(trade.replacementDetails.reduce((sum, d) => sum + d.gain, 0))}</p>}
                     </div>
                   </div>
                   
