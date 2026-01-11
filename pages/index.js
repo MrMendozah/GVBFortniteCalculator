@@ -30,7 +30,6 @@ const useLocalStorage = (key, initialValue) => {
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
-    // Only run on client side
     try {
       const item = window.localStorage.getItem(key)
       if (item) {
@@ -43,7 +42,6 @@ const useLocalStorage = (key, initialValue) => {
   }, [key])
 
   useEffect(() => {
-    // Only save after initial load
     if (isLoaded) {
       try {
         window.localStorage.setItem(key, JSON.stringify(storedValue))
@@ -67,8 +65,8 @@ export default function TradeCalculator() {
   const [lowestPlantCount, setLowestPlantCount] = useLocalStorage('lowestPlantCount', '')
   const [useManualInventory, setUseManualInventory] = useLocalStorage('useManualInventory', false)
   const [inventoryPlants, setInventoryPlants] = useLocalStorage('inventoryPlants', Array(35).fill(''))
+  const [sortOrder, setSortOrder] = useLocalStorage('sortOrder', 'none')
 
-  // Set mounted state
   useEffect(() => {
     setIsMounted(true)
   }, [])
@@ -127,7 +125,6 @@ export default function TradeCalculator() {
         particle.draw()
       })
 
-      // Draw connections
       particles.forEach((a, i) => {
         particles.slice(i + 1).forEach(b => {
           const dx = a.x - b.x
@@ -159,35 +156,72 @@ export default function TradeCalculator() {
     return () => window.removeEventListener('resize', handleResize)
   }, [isMounted])
 
+  // Get sorted inventory for display
+  const getSortedInventory = () => {
+    const indexed = inventoryPlants.map((plant, index) => ({ plant, index }))
+    
+    if (sortOrder === 'high') {
+      return indexed.sort((a, b) => parseNumber(b.plant) - parseNumber(a.plant))
+    } else if (sortOrder === 'low') {
+      return indexed.sort((a, b) => parseNumber(a.plant) - parseNumber(b.plant))
+    }
+    return indexed
+  }
+
+  // Add plant to trade slot
+  const addToTrade = (plantValue) => {
+    const emptyIndex = player1TradeSlots.findIndex(slot => !slot || slot === '')
+    if (emptyIndex !== -1) {
+      const newSlots = [...player1TradeSlots]
+      newSlots[emptyIndex] = plantValue
+      setPlayer1TradeSlots(newSlots)
+      
+      const newFlags = [...player1FromInventory]
+      newFlags[emptyIndex] = true
+      setPlayer1FromInventory(newFlags)
+    }
+  }
+
+  // Remove from trade slot
+  const removeFromTrade = (index) => {
+    const newSlots = [...player1TradeSlots]
+    newSlots[index] = ''
+    setPlayer1TradeSlots(newSlots)
+    
+    const newFlags = [...player1FromInventory]
+    newFlags[index] = false
+    setPlayer1FromInventory(newFlags)
+  }
+
+  // Check if plant is in trade
+  const isInTrade = (plantValue) => {
+    if (!plantValue) return false
+    return player1TradeSlots.includes(plantValue)
+  }
+
   // Calculate trade outcome
   const calculateTrade = () => {
-    // Calculate total - either from manual inventory or from input
     const calculatedTotal = inventoryPlants.reduce((sum, plant) => sum + parseNumber(plant), 0)
     const p1Total = useManualInventory ? calculatedTotal : parseNumber(player1Total)
     
-    // Determine lowest plant damage
     let lowestDamage = 0
     let lowestCount = 0
     
     if (useManualInventory) {
-      // Auto-detect from inventory
       const plantValues = inventoryPlants
         .map(plant => parseNumber(plant))
         .filter(val => val > 0)
-        .sort((a, b) => a - b) // Sort ascending
+        .sort((a, b) => a - b)
       
       if (plantValues.length > 0) {
         lowestDamage = plantValues[0]
-        // Count how many plants have this lowest value
         lowestCount = plantValues.filter(val => val === lowestDamage).length
       }
     } else {
-      // Use manual input
       lowestDamage = parseNumber(lowestPlantDamage)
       lowestCount = parseNumber(lowestPlantCount)
     }
     
-    // Separate what you're trading from base vs inventory
     let basePlants = []
     let inventoryPlantsGiven = []
     
@@ -206,21 +240,18 @@ export default function TradeCalculator() {
     const p1GivingFromInventory = inventoryPlantsGiven.reduce((sum, val) => sum + val, 0)
     const p1TotalGiving = p1GivingFromBase + p1GivingFromInventory
     
-    // Get received plants
     const receivedPlants = player2TradeSlots
       .map(plant => parseNumber(plant))
       .filter(val => val > 0)
-      .sort((a, b) => b - a) // Sort descending
+      .sort((a, b) => b - a)
     
     const p2Giving = receivedPlants.reduce((sum, val) => sum + val, 0)
     
-    // Calculate the actual gain
     let netChange = 0
     let replacementDetails = []
     
-    // Step 1: First, received plants fill the slots of plants traded from base
     let receivedIndex = 0
-    basePlants.sort((a, b) => b - a) // Sort descending
+    basePlants.sort((a, b) => b - a)
     
     for (let i = 0; i < basePlants.length && receivedIndex < receivedPlants.length; i++) {
       const tradedValue = basePlants[i]
@@ -237,7 +268,6 @@ export default function TradeCalculator() {
       receivedIndex++
     }
     
-    // Step 2: Remaining received plants replace lowest plants (if better)
     for (let i = receivedIndex; i < receivedPlants.length; i++) {
       const receivedValue = receivedPlants[i]
       
@@ -251,7 +281,6 @@ export default function TradeCalculator() {
           gain: gain
         })
       } else {
-        // Plant is worse than or equal to lowest, no gain
         replacementDetails.push({
           type: 'none',
           received: receivedValue,
@@ -261,13 +290,8 @@ export default function TradeCalculator() {
       }
     }
     
-    // Calculate total plant damage for lowest plants
     const totalLowestPlantDamage = lowestDamage * lowestCount
-    
-    // Calculate raw difference
     const rawDifference = p2Giving - p1TotalGiving
-    
-    // New total after trade
     const p1NewTotal = p1Total + netChange
     
     return {
@@ -328,7 +352,6 @@ export default function TradeCalculator() {
     setPlayer2TradeSlots(['', '', '', '', '', ''])
   }
 
-  // Don't render until mounted (prevents SSR issues)
   if (!isMounted) {
     return null
   }
@@ -397,7 +420,6 @@ export default function TradeCalculator() {
                     />
                   </div>
 
-                  {/* Lowest Plant Info */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div>
                       <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
@@ -427,12 +449,24 @@ export default function TradeCalculator() {
                 </>
               ) : (
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', display: 'block' }}>
-                    All 35 Plants Inventory
-                    <span style={{ marginLeft: '0.5rem', color: '#a78bfa', fontSize: '0.875rem' }}>
-                      (Total: {formatNumber(trade.p1Total)})
-                    </span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <label style={{ color: '#d1d5db', fontSize: '0.875rem', fontWeight: '600' }}>
+                      All 35 Plants Inventory
+                      <span style={{ marginLeft: '0.5rem', color: '#a78bfa', fontSize: '0.875rem' }}>
+                        (Total: {formatNumber(trade.p1Total)})
+                      </span>
+                    </label>
+                    <select 
+                      value={sortOrder} 
+                      onChange={(e) => setSortOrder(e.target.value)}
+                      className="sort-select"
+                    >
+                      <option value="none">Original Order</option>
+                      <option value="high">High to Low</option>
+                      <option value="low">Low to High</option>
+                    </select>
+                  </div>
+                  
                   {trade.lowestDamage > 0 && (
                     <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(139, 92, 246, 0.15)', borderRadius: '8px' }}>
                       <p style={{ color: '#a78bfa', fontSize: '0.75rem' }}>
@@ -440,17 +474,30 @@ export default function TradeCalculator() {
                       </p>
                     </div>
                   )}
-                  <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
+                  
+                  <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                      {inventoryPlants.map((plant, index) => (
-                        <input
-                          key={index}
-                          type="text"
-                          value={plant}
-                          onChange={(e) => updateInventoryPlant(index, e.target.value)}
-                          placeholder={`Plant ${index + 1}`}
-                          className="input-field-small"
-                        />
+                      {getSortedInventory().map(({ plant, index }) => (
+                        <div key={index} style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            value={plant}
+                            onChange={(e) => updateInventoryPlant(index, e.target.value)}
+                            placeholder={`Plant ${index + 1}`}
+                            className="input-field-small"
+                            style={{ paddingRight: plant && parseNumber(plant) > 0 ? '35px' : '12px' }}
+                          />
+                          {plant && parseNumber(plant) > 0 && (
+                            <button
+                              onClick={() => addToTrade(plant)}
+                              disabled={isInTrade(plant)}
+                              className="add-btn"
+                              title="Add to trade"
+                            >
+                              {isInTrade(plant) ? '✓' : '+'}
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -463,23 +510,35 @@ export default function TradeCalculator() {
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
                 {player1TradeSlots.map((plant, index) => (
-                  <div key={index}>
+                  <div key={index} style={{ position: 'relative' }}>
                     <input
                       type="text"
                       value={plant}
                       onChange={(e) => updateTradeSlot(1, index, e.target.value)}
                       placeholder={`Plant ${index + 1}`}
                       className="input-field-small"
+                      style={{ paddingRight: plant ? '60px' : '12px' }}
                     />
-                    <label style={{ color: '#d1d5db', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={player1FromInventory[index]}
-                        onChange={() => toggleFromInventory(index)}
-                        style={{ width: '14px', height: '14px', cursor: 'pointer' }}
-                      />
-                      From Inventory
-                    </label>
+                    {plant && (
+                      <button
+                        onClick={() => removeFromTrade(index)}
+                        className="remove-btn"
+                        title="Remove from trade"
+                      >
+                        ×
+                      </button>
+                    )}
+                    {!useManualInventory && (
+                      <label style={{ color: '#d1d5db', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={player1FromInventory[index]}
+                          onChange={() => toggleFromInventory(index)}
+                          style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                        />
+                        From Inventory
+                      </label>
+                    )}
                   </div>
                 ))}
               </div>
@@ -550,7 +609,6 @@ export default function TradeCalculator() {
                     {formatNumber(trade.p2Giving)}
                   </p>
 
-                  {/* Replacement Breakdown */}
                   {trade.replacementDetails.length > 0 && (
                     <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                       <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.75rem' }}>
@@ -587,7 +645,6 @@ export default function TradeCalculator() {
                     </div>
                   )}
 
-                  {/* Raw Difference */}
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                     <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Raw Trade Difference</p>
                     <p style={{ 
@@ -603,19 +660,17 @@ export default function TradeCalculator() {
                   </div>
                   
                   {trade.lowestCount > 0 && (
-                    <>
-                      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                          {useManualInventory ? 'Auto-Detected Lowest Plants' : 'Your Lowest Plants'}
-                        </p>
-                        <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
-                          {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
-                        </p>
-                        <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                          Total: {formatNumber(trade.totalLowestPlantDamage)}
-                        </p>
-                      </div>
-                    </>
+                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                      <p style={{ color: '#d1d5db', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                        {useManualInventory ? 'Auto-Detected Lowest Plants' : 'Your Lowest Plants'}
+                      </p>
+                      <p style={{ color: '#a78bfa', fontSize: '0.875rem', fontWeight: '600' }}>
+                        {formatNumber(trade.lowestDamage)} × {trade.lowestCount} plants
+                      </p>
+                      <p style={{ color: '#8b5cf6', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                        Total: {formatNumber(trade.totalLowestPlantDamage)}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -744,6 +799,96 @@ export default function TradeCalculator() {
           color: rgba(255, 255, 255, 0.4);
         }
 
+        .sort-select {
+          padding: 0.5rem 0.75rem;
+          background: rgba(139, 92, 246, 0.2);
+          border: 2px solid rgba(139, 92, 246, 0.5);
+          border-radius: 8px;
+          color: white;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          outline: none;
+        }
+
+        .sort-select:hover {
+          background: rgba(139, 92, 246, 0.3);
+          border-color: rgba(139, 92, 246, 0.7);
+        }
+
+        .sort-select option {
+          background: #1e3a8a;
+          color: white;
+        }
+
+        .add-btn {
+          position: absolute;
+          right: 5px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 28px;
+          height: 28px;
+          background: rgba(34, 197, 94, 0.2);
+          border: 2px solid rgba(34, 197, 94, 0.5);
+          border-radius: 6px;
+          color: #4ade80;
+          font-size: 1.25rem;
+          font-weight: bold;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .add-btn:hover:not(:disabled) {
+          background: rgba(34, 197, 94, 0.3);
+          border-color: rgba(34, 197, 94, 0.7);
+          transform: translateY(-50%) scale(1.1);
+        }
+
+        .add-btn:active:not(:disabled) {
+          transform: translateY(-50%) scale(0.95);
+        }
+
+        .add-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .remove-btn {
+          position: absolute;
+          right: 5px;
+          top: 5px;
+          width: 28px;
+          height: 28px;
+          background: rgba(239, 68, 68, 0.2);
+          border: 2px solid rgba(239, 68, 68, 0.5);
+          border-radius: 6px;
+          color: #f87171;
+          font-size: 1.5rem;
+          font-weight: bold;
+          line-height: 1;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .remove-btn:hover {
+          background: rgba(239, 68, 68, 0.3);
+          border-color: rgba(239, 68, 68, 0.7);
+          transform: scale(1.1);
+        }
+
+        .remove-btn:active {
+          transform: scale(0.95);
+        }
+
         .clear-btn {
           background: rgba(239, 68, 68, 0.2);
           border: 2px solid rgba(239, 68, 68, 0.5);
@@ -754,6 +899,7 @@ export default function TradeCalculator() {
           font-size: 0.875rem;
           cursor: pointer;
           transition: all 0.3s ease;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .clear-btn:hover {
@@ -824,6 +970,21 @@ export default function TradeCalculator() {
 
         .animate-slide-up-delay {
           animation: slideUp 0.6s ease-out 0.2s both;
+        }
+
+        @media (max-width: 768px) {
+          .glass-card {
+            padding: 1.5rem;
+          }
+          
+          h1 {
+            font-size: 2rem !important;
+          }
+          
+          .add-btn, .remove-btn {
+            width: 32px;
+            height: 32px;
+          }
         }
       `}</style>
     </>
